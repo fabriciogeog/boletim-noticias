@@ -1,0 +1,38 @@
+# FastAPI e servidor
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# HTTP e requests
+httpx>=0.25.2,<0.26.0
+aiohttp==3.9.1
+
+# RSS e coleta de notícias
+feedparser==6.0.11
+beautifulsoup4==4.12.3
+lxml==5.1.0
+
+# LLM - Ollama
+ollama>=0.1.6
+
+# TTS - Google Text-to-Speech (mais simples e funcional)
+gTTS>=2.5.0
+
+# Processamento de áudio
+pydub==0.25.1
+soundfile==0.12.1
+
+# Utilidades
+python-dateutil==2.8.2
+pytz==2023.3
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Logging e monitoramento
+python-json-logger==2.0.7
+
+# Database (SQLite)
+sqlalchemy==2.0.25
+alembic==1.13.1
+
+# CORS (já incluído no FastAPI via middleware)

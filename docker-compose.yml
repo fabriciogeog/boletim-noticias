@@ -1,0 +1,24 @@
+services:
+  # Backend API (FastAPI)
+  api:
+    build: ./backend
+    container_name: boletim-api
+    network_mode: host
+    volumes:
+      - ./backend/app:/app
+      - ./data:/app/data
+      - ./audio:/app/audio
+    environment:
+      - OLLAMA_HOST=http://localhost:11434
+      - PYTHONUNBUFFERED=1
+      - TTS_ENGINE=coqui
+    restart: unless-stopped
+
+  # Frontend (Nginx + HTML/CSS/JS)
+  frontend:
+    build: ./frontend
+    container_name: boletim-frontend
+    network_mode: host
+    volumes:
+      - ./frontend/src:/usr/share/nginx/html:ro
+    restart: unless-stopped
