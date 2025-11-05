@@ -52,6 +52,13 @@ function initializeEventListeners() {
     const btnSaveModel = document.getElementById('btn-save-model');
     btnSaveModel.addEventListener('click', handleSaveModel);
     
+    // Botão de teste de áudio (debug)
+    const btnTestAudio = document.getElementById('btn-test-audio');
+    if (btnTestAudio) {
+        btnTestAudio.addEventListener('click', testAudioPlayer);
+        btnTestAudio.style.display = 'inline-flex'; // Mostrar para debug
+    }
+    
     // Navegação
     const navLinks = document.querySelectorAll('nav a');
     navLinks.forEach(link => {
@@ -240,6 +247,9 @@ function displayBoletim(result) {
     const audioPlayer = document.getElementById('audio-player');
     const audioElement = document.getElementById('audio-element');
     
+    console.log('=== DISPLAY BOLETIM ===');
+    console.log('Resultado completo:', result);
+    
     // Mostrar resultado
     resultadoDiv.hidden = false;
     
@@ -247,20 +257,73 @@ function displayBoletim(result) {
     textoTextarea.value = result.summary;
     textoTextarea.readOnly = true;
     
-    // Configurar áudio
-    if (result.audio_file) {
+    // Detectar áudio de múltiplas formas
+    const audioFile = result.audio_filename || result.audio_file;
+    const audioUrl = result.audio_url || result.download_url;
+    
+    console.log('Campos detectados:', {
+        audio_filename: result.audio_filename,
+        audio_file: result.audio_file,
+        audio_url: result.audio_url,
+        download_url: result.download_url
+    });
+    
+    // Verificar se é MP3 (não é .txt)
+    const isMP3 = audioFile && audioFile.endsWith('.mp3');
+    
+    console.log('É MP3?', isMP3, '| Arquivo:', audioFile);
+    
+    if (isMP3) {
+        // Construir URL completa
+        let fullUrl;
+        if (audioUrl) {
+            fullUrl = audioUrl.startsWith('http') ? audioUrl : `${API_BASE_URL}${audioUrl}`;
+        } else {
+            fullUrl = `${API_BASE_URL}/api/download/${audioFile}`;
+        }
+        
+        // Adicionar timestamp anti-cache
+        fullUrl += `?t=${Date.now()}`;
+        
+        console.log('URL final do áudio:', fullUrl);
+        
+        // Resetar e configurar player
+        audioElement.pause();
+        audioElement.src = '';
+        audioElement.load();
+        
+        audioElement.src = fullUrl;
+        audioElement.load();
+        
+        // FORÇAR mostrar player
         audioPlayer.hidden = false;
-        audioElement.src = result.download_url;
-        appState.audioUrl = result.download_url;
+        audioPlayer.style.display = 'block';
+        
+        // Salvar para download
+        appState.audioUrl = fullUrl.split('?')[0];
+        
+        console.log('✓ Player VISÍVEL e configurado');
+        console.log('Player hidden:', audioPlayer.hidden);
+        console.log('Player display:', audioPlayer.style.display);
+        
+        showStatus('Áudio MP3 disponível!', 'success');
+        speakMessage('Áudio gerado com sucesso');
+        
+    } else {
+        console.log('✗ Áudio não é MP3 ou não existe');
+        audioPlayer.hidden = true;
+        
+        if (audioFile && audioFile.endsWith('.txt')) {
+            showStatus('Boletim gerado (modo texto)', 'info');
+        } else {
+            showStatus('Áudio não gerado', 'warning');
+        }
     }
     
-    // Scroll para resultado
+    // Scroll
     resultadoDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     
-    // Anunciar para leitores de tela
-    resultadoDiv.setAttribute('aria-label', 
-        `Boletim gerado com ${result.articles_count} notícias`
-    );
+    console.log('======================');
 }
 
 // ========================================
@@ -430,6 +493,58 @@ function speakMessage(message) {
 // ========================================
 // Configurações - Modelos Ollama
 // ========================================
+async function testAudioPlayer() {
+    try {
+        // Buscar último áudio gerado
+        const response = await fetch(`${API_BASE_URL}/api/list-audio`);
+        if (!response.ok) {
+            // Se endpoint não existir, tentar áudio de teste
+            showAudioDebug();
+            return;
+        }
+        
+        const data = await response.json();
+        if (data.files && data.files.length > 0) {
+            const lastAudio = data.files[0];
+            const audioUrl = `${API_BASE_URL}/api/download/${lastAudio}?t=${Date.now()}`;
+            
+            const audioElement = document.getElementById('audio-element');
+            const audioPlayer = document.getElementById('audio-player');
+            
+            audioElement.src = audioUrl;
+            audioElement.load();
+            audioPlayer.hidden = false;
+            
+            showStatus(`Testando: ${lastAudio}`, 'info');
+            console.log('Áudio de teste carregado:', audioUrl);
+        } else {
+            showStatus('Nenhum áudio encontrado', 'info');
+        }
+    } catch (error) {
+        console.error('Erro ao testar áudio:', error);
+        showAudioDebug();
+    }
+}
+
+function showAudioDebug() {
+    const audioElement = document.getElementById('audio-element');
+    const audioPlayer = document.getElementById('audio-player');
+    
+    console.log('=== DEBUG ÁUDIO ===');
+    console.log('Player hidden:', audioPlayer.hidden);
+    console.log('Audio src:', audioElement.src);
+    console.log('Audio readyState:', audioElement.readyState);
+    console.log('Audio networkState:', audioElement.networkState);
+    console.log('Audio error:', audioElement.error);
+    console.log('appState.audioUrl:', appState.audioUrl);
+    console.log('==================');
+    
+    // Forçar mostrar player para debug
+    audioPlayer.hidden = false;
+    
+    showStatus('Debug info no console (F12)', 'info');
+}
+
 async function loadOllamaModels() {
     try {
         showStatus('Carregando modelos disponíveis...', 'info');

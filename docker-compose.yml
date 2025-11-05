@@ -1,24 +1,75 @@
+version: '3.8'
+
 services:
-  # Backend API (FastAPI)
+  # ========================================
+  # Ollama - LLM Local
+  # Roda em Docker para portabilidade
+  # ========================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: boletim-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - boletim-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ========================================
+  # Backend API - FastAPI
+  # ========================================
   api:
     build: ./backend
     container_name: boletim-api
-    network_mode: host
+    ports:
+      - "8000:8000"
     volumes:
       - ./backend/app:/app
       - ./data:/app/data
       - ./audio:/app/audio
     environment:
-      - OLLAMA_HOST=http://localhost:11434
+      - OLLAMA_HOST=http://ollama:11434
       - PYTHONUNBUFFERED=1
-      - TTS_ENGINE=coqui
+      - TTS_ENGINE=gtts
+    networks:
+      - boletim-network
     restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Frontend (Nginx + HTML/CSS/JS)
+  # ========================================
+  # Frontend - Nginx
+  # ========================================
   frontend:
     build: ./frontend
     container_name: boletim-frontend
-    network_mode: host
+    ports:
+      - "3000:3000"
     volumes:
       - ./frontend/src:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+    networks:
+      - boletim-network
     restart: unless-stopped
+
+networks:
+  boletim-network:
+    driver: bridge
+
+volumes:
+  ollama_data:
+    driver: local

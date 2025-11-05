@@ -65,14 +65,21 @@ status: ## Mostra status dos containers
 	@docker-compose ps
 
 setup-ollama: ## Configura e baixa modelo do Ollama
-	@echo "${YELLOW}Verificando Ollama local...${RESET}"
-	@ollama list || (echo "${RED}Ollama não encontrado! Instale primeiro.${RESET}" && exit 1)
-	@echo "${YELLOW}Baixando modelo llama3.2 para Ollama local...${RESET}"
-	@ollama pull llama3.2
+	@echo "${YELLOW}Baixando modelo para Ollama (Docker)...${RESET}"
+	@docker-compose exec ollama ollama pull llama3:8b
 	@echo "${GREEN}✓ Modelo baixado${RESET}"
 	@echo "${YELLOW}Testando modelo...${RESET}"
-	@ollama run llama3.2 "Olá, diga apenas 'OK' se estiver funcionando"
+	@docker-compose exec ollama ollama run llama3:8b "Olá, diga apenas 'OK' se estiver funcionando"
 	@echo "${GREEN}✓ Ollama configurado${RESET}"
+
+ollama-list: ## Lista modelos Ollama disponíveis
+	@echo "${GREEN}Modelos Ollama instalados:${RESET}"
+	@docker-compose exec ollama ollama list
+
+ollama-pull: ## Baixa um modelo Ollama (uso: make ollama-pull MODEL=gemma3:4b)
+	@echo "${YELLOW}Baixando modelo $(MODEL)...${RESET}"
+	@docker-compose exec ollama ollama pull $(MODEL)
+	@echo "${GREEN}✓ Modelo $(MODEL) baixado${RESET}"
 
 test-api: ## Testa conectividade com API
 	@echo "${YELLOW}Testando API...${RESET}"
@@ -110,9 +117,6 @@ update: ## Atualiza containers e rebuild
 
 shell-api: ## Abre shell no container da API
 	@docker-compose exec api /bin/bash
-
-shell-ollama: ## Abre shell no container do Ollama
-	@docker-compose exec ollama /bin/bash
 
 dev: ## Modo desenvolvimento (com hot reload)
 	@echo "${GREEN}Iniciando em modo desenvolvimento...${RESET}"

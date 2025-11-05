@@ -174,6 +174,7 @@
                     <audio 
                         id="audio-element" 
                         controls 
+                        preload="metadata"
                         aria-label="Player de áudio do boletim gerado"
                     >
                         Seu navegador não suporta o elemento de áudio.
@@ -194,6 +195,15 @@
                             aria-label="Regenerar áudio com texto editado"
                         >
                             Regenerar Áudio
+                        </button>
+                        <button 
+                            type="button" 
+                            id="btn-test-audio" 
+                            class="btn btn-secondary"
+                            aria-label="Testar último áudio"
+                            style="display:none;"
+                        >
+                            🔧 Testar Player
                         </button>
                     </div>
                 </div>

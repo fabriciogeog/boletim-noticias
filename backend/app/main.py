@@ -139,17 +139,70 @@ async def generate_boletim(request: BoletimRequest):
             voice_name=request.voice_name
         )
         
-        return {
+        # Extrair apenas o nome do arquivo
+        audio_filename = audio_path.split('/')[-1] if audio_path else None
+        
+        # Verificar se é MP3 (não é .txt)
+        is_audio = audio_filename and audio_filename.endswith('.mp3')
+        
+        response_data = {
             "success": True,
             "articles_count": len(articles),
             "summary": summary_text,
-            "audio_file": audio_path,
-            "download_url": f"/api/download/{audio_path.split('/')[-1]}"
         }
+        
+        # Adicionar campos de áudio apenas se for MP3
+        if is_audio:
+            response_data["audio_filename"] = audio_filename
+            response_data["audio_file"] = audio_filename
+            response_data["audio_url"] = f"/api/download/{audio_filename}"
+            response_data["download_url"] = f"/api/download/{audio_filename}"
+        else:
+            response_data["audio_filename"] = None
+            response_data["audio_file"] = audio_filename  # pode ser .txt
+            response_data["text_file"] = audio_filename
+        
+        logger.info(f"Resposta: {response_data}")
+        
+        return response_data
         
     except Exception as e:
         logger.error(f"Erro ao gerar boletim: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/list-audio")
+async def list_audio_files():
+    """
+    Lista arquivos de áudio gerados
+    """
+    try:
+        from pathlib import Path
+        import os
+        
+        audio_dir = Path("/app/audio")
+        
+        if not audio_dir.exists():
+            return {"files": [], "count": 0}
+        
+        # Listar arquivos MP3, ordenar por data (mais recente primeiro)
+        files = []
+        for file in audio_dir.glob("*.mp3"):
+            files.append({
+                "name": file.name,
+                "size": file.stat().st_size,
+                "created": file.stat().st_mtime
+            })
+        
+        files.sort(key=lambda x: x['created'], reverse=True)
+        
+        return {
+            "files": [f['name'] for f in files],
+            "count": len(files),
+            "details": files
+        }
+    except Exception as e:
+        logger.error(f"Erro ao listar áudios: {e}")
+        return {"files": [], "count": 0, "error": str(e)}
 
 @app.get("/api/download/{filename}")
 async def download_audio(filename: str):
@@ -157,15 +210,29 @@ async def download_audio(filename: str):
     Download do arquivo de áudio gerado
     """
     try:
-        file_path = f"/app/audio/{filename}"
+        import os
+        from pathlib import Path
+        
+        # Sanitizar nome do arquivo
+        filename = os.path.basename(filename)
+        file_path = Path("/app/audio") / filename
+        
+        if not file_path.exists():
+            logger.error(f"Arquivo não encontrado: {file_path}")
+            raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+        
+        logger.info(f"Enviando arquivo: {file_path}")
+        
         return FileResponse(
-            file_path,
+            path=str(file_path),
             media_type="audio/mpeg",
             filename=filename
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Erro ao baixar áudio: {e}")
-        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/sources")
 async def list_sources():

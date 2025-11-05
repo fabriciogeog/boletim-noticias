@@ -2,433 +2,329 @@
 
 Sistema automatizado para geração de boletins de notícias com IA, desenvolvido especialmente para acessibilidade e uso por locutores de rádio.
 
+> **Arquitetura Unificada**: Funciona identicamente em Linux e Windows usando Docker
+
+---
+
 ## 🎯 Características Principais
 
 - ✅ **Coleta Automática de Notícias** via RSS dos principais portais brasileiros
 - 🤖 **Sumarização Inteligente** usando LLM local (Ollama)
-- 🎙️ **Geração de Áudio** com Text-to-Speech em português brasileiro
+- 🎙️ **Geração de Áudio** com Text-to-Speech em português brasileiro (gTTS)
 - ♿ **100% Acessível** com navegação por teclado e compatível com leitores de tela
 - 🐋 **Docker** para instalação e execução simplificadas
-- 🔒 **Privacidade** - processamento local sem dependências externas
-
----
-
-## 📋 Pré-requisitos
-
-- **Docker** (versão 20.10 ou superior)
-- **Docker Compose** (versão 1.29 ou superior)
-- **8GB de RAM** (mínimo recomendado)
-- **20GB de espaço em disco** (para modelos de IA)
-
-### Instalação do Docker
-
-#### Windows
-1. Baixe [Docker Desktop para Windows](https://www.docker.com/products/docker-desktop)
-2. Execute o instalador e siga as instruções
-3. Reinicie o computador quando solicitado
-
-#### Linux (Ubuntu/Debian)
-```bash
-# Instalar Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-
-# Adicionar usuário ao grupo docker
-sudo usermod -aG docker $USER
-
-# Instalar Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
-# Reiniciar para aplicar mudanças
-logout
-```
-
-#### macOS
-1. Baixe [Docker Desktop para Mac](https://www.docker.com/products/docker-desktop)
-2. Arraste para a pasta Aplicativos
-3. Execute e siga as instruções
+- 🔒 **Privacidade** - processamento local, dados não saem da máquina
+- 🔄 **Cross-Platform** - mesma arquitetura em Linux e Windows
 
 ---
 
 ## 🚀 Instalação Rápida
 
-### 1. Clone o Repositório
+### Linux / macOS
 ```bash
+# Clonar repositório
 git clone https://github.com/seu-usuario/boletim-noticias.git
 cd boletim-noticias
-```
 
-### 2. Instale o Sistema
-```bash
+# Instalar e iniciar
 make install
-```
-
-Este comando irá:
-- Verificar dependências (Docker)
-- Criar estrutura de diretórios
-- Construir containers Docker
-- Preparar ambiente
-
-### 3. Inicie os Serviços
-```bash
 make start
-```
 
-### 4. Configure o Ollama (primeira vez)
-```bash
+# Baixar modelo LLM
 make setup-ollama
-```
-⚠️ Este passo pode levar alguns minutos (download do modelo ~4GB)
 
-### 5. Acesse o Sistema
-Abra seu navegador em: **http://localhost:3000**
+# Acessar
+http://localhost:3000
+```
+
+### Windows
+```powershell
+# Extrair projeto
+cd C:\Projetos\boletim-noticias
+
+# Executar instalador (como Administrador)
+.\install-windows.bat
+
+# Acessar
+http://localhost:3000
+```
+
+📖 **Guias Detalhados:**
+- 🐧 [**Instalação no Linux**](LINUX.md) - Guia completo para Ubuntu/Debian/Fedora
+- 🪟 [**Instalação no Windows**](WINDOWS.md) - Guia completo para Windows 10/11
 
 ---
 
-## 📖 Uso do Sistema
+## 📋 Requisitos
 
-### Interface Principal
+### Software
+- **Docker Desktop** (Windows/Mac) ou **Docker Engine** (Linux)
+- **Docker Compose** v1.29+
+- **Navegador moderno** (Chrome, Firefox, Edge)
 
-#### 1. Configurar Boletim
-- Selecione **categorias** de notícias (Geral, Política, Economia, etc.)
-- Defina **número de notícias** (recomendado: 5-10)
-- Escolha o **estilo** (Jornalístico ou Conversacional)
-- Marque opções: Introdução e Encerramento
+### Hardware
+- **RAM**: 8GB mínimo (16GB recomendado)
+- **Disco**: 30GB livres
+- **CPU**: Processador moderno (i5/Ryzen 5 ou superior)
+- **Internet**: Para coleta de notícias e download inicial
 
-#### 2. Gerar Boletim
-- Clique em "**Gerar Boletim**" ou pressione **Ctrl+Enter**
-- Aguarde o processamento (coleta → sumarização → áudio)
-- O texto do boletim será exibido automaticamente
+---
 
-#### 3. Revisar e Editar
-- Leia o texto gerado
-- Clique em "**Editar Texto**" ou pressione **Ctrl+E** para fazer alterações
-- Corrija nomes, siglas ou ajuste o conteúdo
+## 🏗️ Arquitetura
 
-#### 4. Áudio e Download
-- Ouça o preview do áudio gerado
-- Se editou o texto, clique em "**Regenerar Áudio**"
-- Clique em "**Baixar Áudio**" ou pressione **Ctrl+D** para salvar o MP3
+```
+┌─────────────────────────────────────────────────┐
+│                   NAVEGADOR                      │
+│              http://localhost:3000               │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────────┐
+│               FRONTEND (Nginx)                   │
+│            Interface Acessível                   │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────────┐
+│            BACKEND API (FastAPI)                 │
+│   • Coleta RSS                                   │
+│   • Sumarização                                  │
+│   • Geração TTS                                  │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────────────┐
+│              OLLAMA (Docker)                     │
+│           LLM Local - llama3:8b                  │
+└─────────────────────────────────────────────────┘
+```
+
+**Todos os componentes rodam em Docker containers** - portabilidade garantida!
+
+---
+
+## 🎮 Uso Básico
+
+### Comandos Linux/Mac (Makefile)
+```bash
+make start          # Iniciar sistema
+make stop           # Parar sistema
+make logs           # Ver logs
+make status         # Status dos containers
+make ollama-list    # Listar modelos LLM
+make backup         # Backup dos dados
+```
+
+### Comandos Windows (Batch)
+```powershell
+.\comandos.bat start     # Iniciar sistema
+.\comandos.bat stop      # Parar sistema
+.\comandos.bat logs      # Ver logs
+.\comandos.bat status    # Status dos containers
+.\comandos.bat ollama    # Gerenciar modelos
+```
+
+### Interface Web
+
+1. **Acesse**: http://localhost:3000
+2. **Configure**: Marque categorias (Geral, Política, Economia...)
+3. **Gere**: Clique em "Gerar Boletim" ou `Ctrl+Enter`
+4. **Aguarde**: ~30-60 segundos
+5. **Baixe**: MP3 gerado para usar no programa!
+
+---
+
+## ♿ Acessibilidade
+
+Sistema projetado seguindo **WCAG 2.1**:
+
+- ✅ Navegação 100% por teclado
+- ✅ Compatível com NVDA, JAWS
+- ✅ ARIA labels completos
+- ✅ Feedback sonoro
+- ✅ Alto contraste
+- ✅ Skip links
 
 ### Atalhos de Teclado
 
 | Atalho | Ação |
 |--------|------|
-| `Ctrl + Enter` | Gerar boletim |
-| `Ctrl + E` | Editar texto |
-| `Ctrl + D` | Baixar áudio |
-| `Alt + 1` | Ir para Gerar Boletim |
-| `Alt + 2` | Ir para Histórico |
-| `Alt + 3` | Ir para Configurações |
-| `Alt + 4` | Ir para Ajuda |
-| `Tab` | Navegar para próximo elemento |
-| `Shift + Tab` | Navegar para elemento anterior |
+| `Ctrl+Enter` | Gerar boletim |
+| `Ctrl+E` | Editar texto |
+| `Ctrl+D` | Baixar áudio |
+| `Alt+1` a `Alt+4` | Navegação rápida |
 
 ---
 
-## 🎛️ Comandos Make
+## 🔧 Configurações
 
-O sistema usa **Makefile** para facilitar operações comuns:
+### Selecionar Modelo LLM
 
-```bash
-make help              # Mostra todos os comandos disponíveis
-make install           # Instala o sistema
-make start             # Inicia serviços
-make stop              # Para serviços
-make restart           # Reinicia serviços
-make logs              # Mostra logs em tempo real
-make logs-api          # Logs apenas da API
-make status            # Status dos containers
-make setup-ollama      # Configura Ollama (primeira vez)
-make test-api          # Testa API
-make test-feeds        # Testa coleta de notícias
-make clean             # Remove containers e volumes
-make backup            # Faz backup dos dados
-make update            # Atualiza sistema
-make shell-api         # Abre terminal no container da API
-```
+1. Acesse: **Configurações** no menu
+2. Veja modelos disponíveis
+3. Selecione o desejado
+4. Salve configuração
+
+### Modelos Recomendados
+
+| Modelo | Tamanho | Velocidade | Qualidade | RAM Mínima |
+|--------|---------|------------|-----------|------------|
+| **gemma3:4b** | 3.3GB | Rápido | Boa | 8GB |
+| **llama3:8b** | 4.7GB | Médio | Excelente | 12GB |
+| **mistral:7b** | 4.4GB | Médio | Muito Boa | 10GB |
 
 ---
 
-## 🏗️ Arquitetura do Sistema
+## 📊 Fontes de Notícias
 
-```
-┌─────────────────────────────────────────────────┐
-│                   FRONTEND                       │
-│         (HTML5 + CSS + JavaScript)              │
-│              http://localhost:3000               │
-└──────────────────┬──────────────────────────────┘
-                   │
-                   │ API REST
-                   │
-┌──────────────────▼──────────────────────────────┐
-│                BACKEND API                       │
-│              (FastAPI/Python)                    │
-│            http://localhost:8000                 │
-│                                                  │
-│  ┌─────────────┐  ┌─────────────┐              │
-│  │   News      │  │  Summarizer │              │
-│  │  Collector  │  │   (Ollama)  │              │
-│  └─────────────┘  └─────────────┘              │
-│                                                  │
-│  ┌─────────────────────────────────┐           │
-│  │     TTS Generator               │           │
-│  │     (Coqui TTS)                 │           │
-│  └─────────────────────────────────┘           │
-└─────────────────────────────────────────────────┘
-                   │
-                   │
-        ┌──────────▼───────────┐
-        │   OLLAMA (LLM)       │
-        │  http://localhost    │
-        │       :11434         │
-        └──────────────────────┘
-```
-
-### Componentes
-
-1. **Frontend**: Interface acessível em HTML/CSS/JS
-2. **Backend API**: FastAPI gerenciando fluxo de trabalho
-3. **News Collector**: Coleta notícias via RSS
-4. **Summarizer**: Sumariza usando Ollama (LLM local)
-5. **TTS Generator**: Converte texto em áudio
-6. **Ollama**: Motor de LLM rodando localmente
-
----
-
-## 🔧 Configuração Avançada
-
-### Fontes de Notícias
-
-O sistema coleta de múltiplas fontes brasileiras:
 - **G1** (Globo)
 - **UOL Notícias**
+- **CNN Brasil**
 - **Folha de S.Paulo**
-- **Terra**
-- **Estadão**
 
-Categorias disponíveis:
-- Geral
-- Política
-- Economia
-- Esportes
-- Tecnologia
-- Mundo
-
-### Personalização do LLM
-
-Para usar modelos diferentes do Ollama:
-
-```bash
-# Listar modelos disponíveis
-docker-compose exec ollama ollama list
-
-# Baixar outro modelo
-docker-compose exec ollama ollama pull gemma2
-
-# Editar backend/app/services/summarizer.py
-# Alterar: self.model = "gemma2"
-```
-
-### Personalização de Voz (TTS)
-
-Edite `backend/app/services/tts_generator.py`:
-- Ajustar velocidade de fala
-- Trocar modelos TTS
-- Configurar pronúncia de siglas
+**Categorias:** Geral, Política, Economia, Esportes, Tecnologia, Mundo
 
 ---
 
 ## 🐛 Solução de Problemas
 
-### Container não inicia
+### Sistema não inicia
 ```bash
-# Ver logs detalhados
-make logs
+# Ver logs
+make logs           # Linux
+.\comandos.bat logs # Windows
 
-# Verificar status
-make status
-
-# Reconstruir containers
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+# Reiniciar
+make restart        # Linux
+.\comandos.bat restart # Windows
 ```
 
-### Ollama não responde
+### Sem modelos LLM
 ```bash
-# Verificar se modelo foi baixado
-docker-compose exec ollama ollama list
-
-# Rebaixar modelo
-make setup-ollama
-
-# Ver logs do Ollama
-make logs-ollama
+# Baixar modelo
+make setup-ollama                               # Linux
+docker exec boletim-ollama ollama pull llama3:8b # Ambos
 ```
 
-### API retorna erro 500
-```bash
-# Ver logs da API
-make logs-api
-
-# Entrar no container para debug
-make shell-api
-
-# Verificar saúde da API
-make test-api
-```
-
-### Áudio não é gerado
-```bash
-# Verificar logs
-make logs-api
-
-# Pode ser falta de espaço em disco
-df -h
-
-# Limpar arquivos antigos
-rm -rf audio/exports/*
-```
-
-### Port já em uso
-Se as portas 3000 ou 8000 já estiverem em uso:
-
-Edite `docker-compose.yml`:
+### Porta em uso
+Edite `docker-compose.yml` e mude as portas:
 ```yaml
 ports:
-  - "3001:80"    # Mudar frontend para 3001
-  - "8001:8000"  # Mudar API para 8001
+  - "3001:3000"  # Frontend
+  - "8001:8000"  # API
 ```
+
+📖 **Mais soluções:** Veja guias específicos ([Linux](LINUX.md) / [Windows](WINDOWS.md))
 
 ---
 
-## 📊 Monitoramento
+## 📁 Estrutura do Projeto
 
-### Ver recursos utilizados
-```bash
-make monitor
-```
-
-### Logs em tempo real
-```bash
-# Todos os serviços
-make logs
-
-# Apenas API
-make logs-api
-
-# Apenas Ollama
-make logs-ollama
-```
-
----
-
-## 🔐 Backup e Restore
-
-### Fazer backup
-```bash
-make backup
-```
-Cria arquivo `backup_YYYYMMDD_HHMMSS.tar.gz` com dados e áudios.
-
-### Restaurar backup
-```bash
-tar -xzf backup_YYYYMMDD_HHMMSS.tar.gz
-make restart
-```
-
----
-
-## 🚀 Atualização
-
-Para atualizar o sistema:
-```bash
-make update
-```
-
----
-
-## 📝 Desenvolvimento
-
-### Estrutura de Pastas
 ```
 boletim-noticias/
+├── docker-compose.yml       # Orquestração (único para todos SOs)
+├── Makefile                 # Comandos Linux/Mac
+├── comandos.bat             # Comandos Windows
+├── README.md                # Este arquivo
+├── LINUX.md                 # Guia Linux
+├── WINDOWS.md               # Guia Windows
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── app/
 │       ├── main.py
 │       └── services/
-│           ├── news_collector.py
-│           ├── summarizer.py
-│           └── tts_generator.py
 ├── frontend/
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   └── src/
 │       ├── index.html
-│       ├── css/styles.css
+│       ├── css/
 │       └── js/
-│           ├── app.js
-│           └── accessibility.js
-├── data/           # Dados persistentes
-├── audio/          # Áudios gerados
-├── docker-compose.yml
-├── Makefile
-└── README.md
-```
-
-### Modo Desenvolvimento
-```bash
-# Inicia com hot reload e logs visíveis
-make dev
+├── data/                    # Dados persistentes
+└── audio/                   # Áudios gerados
 ```
 
 ---
 
-## ♿ Acessibilidade
+## 🔄 Atualizações
 
-O sistema foi projetado seguindo as diretrizes **WCAG 2.1**:
+### Linux/Mac
+```bash
+git pull
+make update
+```
 
-- ✅ Navegação completa por teclado
-- ✅ Compatível com leitores de tela (NVDA, JAWS)
-- ✅ Alto contraste
-- ✅ Feedback sonoro para ações
-- ✅ Labels e ARIA attributes em todos os elementos
-- ✅ Skip links para navegação rápida
-- ✅ Atalhos de teclado personalizados
+### Windows
+```powershell
+git pull
+.\comandos.bat update
+```
+
+---
+
+## 💾 Backup
+
+### Automático
+```bash
+make backup          # Linux
+.\comandos.bat backup # Windows
+```
+
+Cria: `backup_YYYYMMDD_HHMMSS.tar.gz`
+
+### Manual
+Copie as pastas: `data/` e `audio/`
+
+---
+
+## 🤝 Contribuindo
+
+Este é um projeto de código aberto. Contribuições são bem-vindas!
+
+1. Fork o projeto
+2. Crie sua feature branch
+3. Commit suas mudanças
+4. Push para o branch
+5. Abra um Pull Request
 
 ---
 
 ## 📄 Licença
 
-Este projeto é open-source. Sinta-se livre para usar, modificar e distribuir.
+Este projeto é open-source sob licença MIT.
 
 ---
 
-## 🤝 Suporte
+## 👥 Suporte
 
-Para dúvidas ou problemas:
-1. Verifique a seção de **Solução de Problemas**
-2. Consulte os **logs**: `make logs`
-3. Abra uma issue no repositório
-
----
-
-## 🎓 Créditos
-
-Desenvolvido com foco em acessibilidade e usabilidade para locutores de rádio.
-
-Tecnologias utilizadas:
-- FastAPI
-- Ollama (LLM)
-- Coqui TTS
-- Docker
-- HTML5/CSS/JavaScript
+- 📖 [Guia Linux](LINUX.md)
+- 🪟 [Guia Windows](WINDOWS.md)
+- 🐛 Issues: GitHub Issues
+- 💬 Discussões: GitHub Discussions
 
 ---
 
-**Versão**: 1.0.0  
-**Última atualização**: Outubro 2024
+## 🎓 Tecnologias Utilizadas
+
+- **Backend**: FastAPI, Python 3.11
+- **Frontend**: HTML5, CSS3, JavaScript
+- **LLM**: Ollama (llama3, gemma3, mistral)
+- **TTS**: Google Text-to-Speech (gTTS)
+- **Containerização**: Docker, Docker Compose
+- **Web Server**: Nginx
+
+---
+
+## ✨ Versão
+
+**v2.0.0** - Arquitetura Unificada (Novembro 2024)
+
+- ✅ Ollama integrado no Docker
+- ✅ Portabilidade Linux/Windows
+- ✅ Seleção dinâmica de modelos
+- ✅ Interface acessível aprimorada
+
+---
+
+**Desenvolvido com ❤️ para acessibilidade e usabilidade**

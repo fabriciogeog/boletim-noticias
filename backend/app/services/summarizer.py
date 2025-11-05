@@ -12,7 +12,8 @@ class NewsSummarizer:
     
     def __init__(self):
         self.ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        self.model = "llama3:8b"  # Modelo padrão
+        #self.model = "llama3:8b"  # Modelo padrão
+        self.model = "deepseek-v3.1:671b-cloud"
         
     async def summarize(
         self,
