@@ -1,14 +1,20 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import logging
 from datetime import datetime
+import os
+from pathlib import Path
 
+# --- Importações do Projeto ---
 from services.news_collector import NewsCollector
 from services.summarizer import NewsSummarizer
 from services.tts_generator import TTSGenerator
+
+# --- Importações do Banco de Dados ---
+from database import db_session, init_db, Boletim as BoletimModel
 
 # Configurar logging
 logging.basicConfig(
@@ -17,17 +23,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Inicializar FastAPI
+# Evento de Inicialização
 app = FastAPI(
     title="Boletim de Notícias API",
     description="API para coleta, sumarização e geração de áudio de notícias",
-    version="1.0.0"
+    version="3.0.0 (Leve)",
+    on_startup=[init_db]  # <-- Cria o DB ao iniciar
 )
 
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,25 +46,47 @@ summarizer = NewsSummarizer()
 tts_generator = TTSGenerator()
 
 # Modelos Pydantic
-class NewsRequest(BaseModel):
-    categories: List[str] = ["geral"]
-    num_articles: int = 10
-    sources: Optional[List[str]] = None
-
 class BoletimRequest(BaseModel):
     categories: List[str] = ["geral"]
     num_articles: int = 10
-    style: str = "jornalistico"  # jornalistico, conversacional
+    style: str = "jornalistico"
     include_intro: bool = True
     include_outro: bool = True
     voice_name: Optional[str] = None
 
-# Rotas
+class AudioRequest(BaseModel):
+    text: str
+
+class BoletimResponse(BaseModel):
+    id: int
+    timestamp: datetime
+    summary_text: str
+    audio_filename: Optional[str] = None
+    categories: Optional[str] = None
+    
+    class Config:
+        from_attributes = True # CORREÇÃO: 'orm_mode' foi renomeado para 'from_attributes'
+
+# ================================================================
+# CORREÇÃO: Substituindo o @app.teardown_appcontext
+# Esta é a forma correta do FastAPI de gerenciar a sessão do DB
+# ================================================================
+@app.middleware("http")
+async def db_session_middleware(request: Request, call_next):
+    """
+    Garante que a sessão do banco de dados seja fechada
+    após cada requisição.
+    """
+    response = await call_next(request)
+    db_session.remove()
+    return response
+
+# --- Rotas Principais (Sem Alteração) ---
 @app.get("/")
 async def root():
     return {
         "message": "Boletim de Notícias API",
-        "version": "1.0.0",
+        "version": "3.0.0 (Leve)",
         "status": "running"
     }
 
@@ -69,49 +98,11 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
-@app.post("/api/collect-news")
-async def collect_news(request: NewsRequest):
-    """
-    Coleta notícias dos feeds RSS
-    """
-    try:
-        logger.info(f"Coletando notícias: {request.categories}")
-        articles = await news_collector.collect(
-            categories=request.categories,
-            limit=request.num_articles,
-            sources=request.sources
-        )
-        
-        return {
-            "success": True,
-            "count": len(articles),
-            "articles": articles
-        }
-    except Exception as e:
-        logger.error(f"Erro ao coletar notícias: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/summarize")
-async def summarize_news(articles: List[dict]):
-    """
-    Sumariza notícias usando Ollama
-    """
-    try:
-        logger.info(f"Sumarizando {len(articles)} notícias")
-        summary = await summarizer.summarize(articles)
-        
-        return {
-            "success": True,
-            "summary": summary
-        }
-    except Exception as e:
-        logger.error(f"Erro ao sumarizar: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/generate-boletim")
+# --- Rota Modificada (generate_boletim) ---
+@app.post("/api/generate-boletim", response_model=BoletimResponse)
 async def generate_boletim(request: BoletimRequest):
     """
-    Fluxo completo: coleta -> sumarização -> geração de áudio
+    Fluxo completo: coleta -> sumarização -> geração de áudio -> SALVAR NO DB
     """
     try:
         logger.info("Iniciando geração de boletim completo")
@@ -139,82 +130,89 @@ async def generate_boletim(request: BoletimRequest):
             voice_name=request.voice_name
         )
         
-        # Extrair apenas o nome do arquivo
-        audio_filename = audio_path.split('/')[-1] if audio_path else None
+        audio_filename = os.path.basename(audio_path) if audio_path else None
         
-        # Verificar se é MP3 (não é .txt)
-        is_audio = audio_filename and audio_filename.endswith('.mp3')
+        # 4. Salvar no Banco de Dados
+        try:
+            categories_str = ", ".join(request.categories)
+            
+            novo_boletim = BoletimModel(
+                summary_text=summary_text,
+                audio_filename=audio_filename,
+                categories=categories_str
+            )
+            db_session.add(novo_boletim)
+            db_session.commit()
+            
+            logger.info(f"✓ Boletim salvo no histórico (ID: {novo_boletim.id})")
+            
+            # Retorna o objeto recém-criado para o frontend
+            return novo_boletim
+            
+        except Exception as db_error:
+            logger.error(f"✗ Erro ao salvar boletim no banco de dados: {db_error}")
+            db_session.rollback()
+            # Retorna um objeto temporário para o frontend não quebrar
+            return BoletimResponse(
+                id=0, 
+                timestamp=datetime.utcnow(), 
+                summary_text=summary_text,
+                audio_filename=audio_filename,
+                categories=", ".join(request.categories)
+            )
         
-        response_data = {
-            "success": True,
-            "articles_count": len(articles),
-            "summary": summary_text,
-        }
-        
-        # Adicionar campos de áudio apenas se for MP3
-        if is_audio:
-            response_data["audio_filename"] = audio_filename
-            response_data["audio_file"] = audio_filename
-            response_data["audio_url"] = f"/api/download/{audio_filename}"
-            response_data["download_url"] = f"/api/download/{audio_filename}"
-        else:
-            response_data["audio_filename"] = None
-            response_data["audio_file"] = audio_filename  # pode ser .txt
-            response_data["text_file"] = audio_filename
-        
-        logger.info(f"Resposta: {response_data}")
-        
-        return response_data
-        
+    except HTTPException as e:
+        logger.error(f"Erro HTTP ao gerar boletim: {e.detail}")
+        raise e
     except Exception as e:
-        logger.error(f"Erro ao gerar boletim: {e}")
+        logger.error(f"Erro inesperado ao gerar boletim: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/list-audio")
-async def list_audio_files():
+# --- Rota Modificada (generate_audio) ---
+@app.post("/api/generate-audio")
+async def generate_audio_from_text(request: AudioRequest):
     """
-    Lista arquivos de áudio gerados
+    Gera áudio a partir de um texto fornecido (regeneração).
     """
     try:
-        from pathlib import Path
-        import os
+        logger.info(f"Iniciando regeneração de áudio: {len(request.text)} caracteres")
         
-        audio_dir = Path("/app/audio")
+        if not request.text:
+            raise HTTPException(status_code=400, detail="Texto vazio fornecido")
         
-        if not audio_dir.exists():
-            return {"files": [], "count": 0}
+        audio_path = await tts_generator.generate(
+            text=request.text,
+            voice_name=None 
+        )
         
-        # Listar arquivos MP3, ordenar por data (mais recente primeiro)
-        files = []
-        for file in audio_dir.glob("*.mp3"):
-            files.append({
-                "name": file.name,
-                "size": file.stat().st_size,
-                "created": file.stat().st_mtime
-            })
+        audio_filename = os.path.basename(audio_path) if audio_path else None
+        is_audio = audio_filename and audio_filename.endswith('.mp3')
         
-        files.sort(key=lambda x: x['created'], reverse=True)
+        if not is_audio:
+            logger.error(f"Falha ao gerar arquivo MP3, fallback para texto: {audio_filename}")
+            raise HTTPException(status_code=500, detail="Falha ao gerar arquivo de áudio")
+
+        logger.info(f"Áudio regenerado com sucesso: {audio_filename}")
         
         return {
-            "files": [f['name'] for f in files],
-            "count": len(files),
-            "details": files
+            "success": True,
+            "audio_filename": audio_filename,
+            "download_url": f"/api/download/{audio_filename}",
+            "audio_url": f"/api/download/{audio_filename}"
         }
+        
     except Exception as e:
-        logger.error(f"Erro ao listar áudios: {e}")
-        return {"files": [], "count": 0, "error": str(e)}
+        logger.error(f"Erro ao regenerar áudio: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
+# --- Rota /api/download (Sem Alteração) ---
 @app.get("/api/download/{filename}")
 async def download_audio(filename: str):
     """
     Download do arquivo de áudio gerado
     """
     try:
-        import os
-        from pathlib import Path
-        
-        # Sanitizar nome do arquivo
-        filename = os.path.basename(filename)
+        filename = os.path.basename(filename) # Sanitização
         file_path = Path("/app/audio") / filename
         
         if not file_path.exists():
@@ -234,66 +232,65 @@ async def download_audio(filename: str):
         logger.error(f"Erro ao baixar áudio: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/sources")
-async def list_sources():
-    """
-    Lista fontes de notícias disponíveis
-    """
-    return {
-        "sources": news_collector.get_available_sources()
-    }
+# ===============================================
+# NOVAS ROTAS (Fase 2 - Histórico)
+# ===============================================
 
-@app.get("/api/voices")
-async def list_voices():
+@app.get("/api/historico", response_model=List[BoletimResponse])
+async def get_historico():
     """
-    Lista vozes TTS disponíveis
-    """
-    return {
-        "voices": tts_generator.get_available_voices()
-    }
-
-@app.get("/api/ollama/models")
-async def list_ollama_models():
-    """
-    Lista modelos Ollama disponíveis
+    Busca todos os boletins salvos no banco de dados,
+    ordenados do mais recente para o mais antigo.
     """
     try:
-        import ollama
-        response = ollama.list()
-        models = [model['name'] for model in response.get('models', [])]
-        
-        return {
-            "success": True,
-            "models": models,
-            "current": summarizer.model
-        }
+        logger.info("Buscando histórico de boletins...")
+        # Busca todos, ordena por ID decrescente (mais novo primeiro)
+        boletins = db_session.query(BoletimModel).order_by(BoletimModel.id.desc()).all()
+        return boletins
     except Exception as e:
-        logger.error(f"Erro ao listar modelos Ollama: {e}")
-        return {
-            "success": False,
-            "models": [],
-            "current": summarizer.model,
-            "error": str(e)
-        }
+        logger.error(f"Erro ao buscar histórico: {e}")
+        return []
 
-@app.post("/api/ollama/set-model")
-async def set_ollama_model(model_name: str):
+@app.delete("/api/historico/{boletim_id}", response_model=dict)
+async def delete_boletim(boletim_id: int):
     """
-    Define o modelo Ollama a ser usado
+    Exclui um registro de boletim do banco de dados E
+    o arquivo de áudio associado do disco (limpeza manual).
     """
     try:
-        summarizer.model = model_name
-        logger.info(f"Modelo alterado para: {model_name}")
+        logger.info(f"Tentando excluir boletim ID: {boletim_id}")
         
-        return {
-            "success": True,
-            "model": model_name,
-            "message": f"Modelo alterado para {model_name}"
-        }
+        # Encontra o registro no DB
+        boletim_db = db_session.query(BoletimModel).get(boletim_id)
+        
+        if not boletim_db:
+            logger.warning(f"Boletim ID {boletim_id} não encontrado no DB.")
+            raise HTTPException(status_code=404, detail="Boletim não encontrado")
+
+        audio_filename = boletim_db.audio_filename
+        
+        # 1. Deleta o registro do DB
+        db_session.delete(boletim_db)
+        db_session.commit()
+        
+        logger.info(f"✓ Registro ID {boletim_id} excluído do DB.")
+
+        # 2. Deleta o arquivo de áudio (se existir)
+        if audio_filename:
+            try:
+                file_path = Path("/app/audio") / os.path.basename(audio_filename)
+                if file_path.exists():
+                    file_path.unlink()
+                    logger.info(f"✓ Arquivo de áudio {audio_filename} excluído do disco.")
+                else:
+                    logger.warning(f"Arquivo de áudio {audio_filename} não encontrado no disco (pode já ter sido excluído).")
+            except Exception as e_file:
+                logger.error(f"Erro ao excluir arquivo de áudio {audio_filename}: {e_file}")
+                # Não falha a requisição se o arquivo não puder ser deletado
+        
+        return {"success": True, "message": f"Boletim ID {boletim_id} excluído."}
+
     except Exception as e:
-        logger.error(f"Erro ao alterar modelo: {e}")
+        db_session.rollback()
+        logger.error(f"Erro ao excluir boletim: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
