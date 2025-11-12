@@ -1,4 +1,63 @@
 /* ========================================
+   Tema do Dashboard (Sua Paleta v2)
+   ======================================== */
+:root {
+    /* Sua paleta */
+    --color-bg-dark: #1F1300;
+    --color-base-olive: #AF9B46;
+    --color-primary-orange: #F7B05B;
+    --color-accent-yellow: #F7CE5B;
+    --color-text-beige: #DFD6A7;
+
+    /* Cores de Fundo */
+    --bg-primary: var(--color-bg-dark);       /* Fundo do Body (Mais escuro) */
+    --bg-secondary: var(--color-base-olive);  /* Fundo da Sidebar e Cards (Oliva) */
+    --bg-tertiary: #c9b977;     /* Hover do Oliva (levemente mais claro) */
+    
+    /* Cores de Texto */
+    --text-primary: var(--color-text-beige); /* Texto no fundo escuro (fora dos cards) */
+    --text-on-secondary: var(--color-bg-dark); /* Texto no fundo oliva (dentro dos cards) */
+    --text-tertiary: #524721;      /* Texto sutil (dentro dos cards) */
+    
+    /* Bordas */
+    --border-color: var(--color-accent-yellow);
+    --border-radius: 8px;
+    
+    /* Botões */
+    --color-primary: var(--color-primary-orange);
+    --color-primary-hover: var(--color-accent-yellow);
+    --color-primary-text: var(--color-bg-dark);
+
+    --color-secondary: var(--color-accent-yellow);
+    --color-secondary-hover: var(--color-text-beige);
+    --color-secondary-text: var(--color-bg-dark);
+
+    /* Cores Semânticas */
+    --color-success: #10b981;
+    --color-danger: #ef4444;
+    --color-warning: #f59e0b;
+    
+    /* Sombras */
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.2);
+    
+    /* Espaçamento */
+    --spacing-xs: 0.5rem;
+    --spacing-sm: 1rem;
+    --spacing-md: 1.5rem;
+    --spacing-lg: 2rem;
+    
+    /* Fontes */
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-size-base: 16px;
+    --font-size-lg: 18px;
+    --font-size-xl: 24px;
+    --line-height: 1.6;
+
+    /* Layout */
+    --sidebar-width: 260px;
+}
+
+/* ========================================
    Reset e Base
    ======================================== */
 * {
@@ -7,256 +66,227 @@
     box-sizing: border-box;
 }
 
-:root {
-    /* Cores principais */
-    --color-primary: #2563eb;
-    --color-primary-dark: #1e40af;
-    --color-secondary: #64748b;
-    --color-success: #10b981;
-    --color-danger: #ef4444;
-    --color-warning: #f59e0b;
-    
-    /* Cores de fundo */
-    --bg-primary: #ffffff;
-    --bg-secondary: #f8fafc;
-    --bg-tertiary: #e2e8f0;
-    
-    /* Cores de texto */
-    --text-primary: #1e293b;
-    --text-secondary: #475569;
-    --text-tertiary: #94a3b8;
-    
-    /* Bordas */
-    --border-color: #cbd5e1;
-    --border-radius: 8px;
-    
-    /* Sombras */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-    
-    /* Espaçamento */
-    --spacing-xs: 0.5rem;
-    --spacing-sm: 1rem;
-    --spacing-md: 1.5rem;
-    --spacing-lg: 2rem;
-    --spacing-xl: 3rem;
-    
-    /* Fontes */
-    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --font-size-base: 16px;
-    --font-size-lg: 18px;
-    --font-size-xl: 24px;
-    --line-height: 1.6;
-}
-
-/* Modo Alto Contraste */
-@media (prefers-contrast: high) {
-    :root {
-        --color-primary: #0047ab;
-        --text-primary: #000000;
-        --bg-primary: #ffffff;
-        --border-color: #000000;
-    }
-}
-
 html {
     font-size: var(--font-size-base);
+    background-color: var(--bg-primary);
 }
 
 body {
     font-family: var(--font-family);
     line-height: var(--line-height);
-    color: var(--text-primary);
-    background-color: var(--bg-secondary);
+    color: var(--text-primary); /* Padrão é texto claro */
+    background-color: var(--bg-primary); /* Fundo escuro */
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
 }
 
 /* ========================================
-   Acessibilidade
+   Acessibilidade (Foco)
    ======================================== */
-
-/* Skip Links */
 .skip-link {
     position: absolute;
     top: -40px;
     left: 0;
     background: var(--color-primary);
-    color: white;
+    color: var(--color-primary-text);
     padding: var(--spacing-xs) var(--spacing-sm);
     text-decoration: none;
     z-index: 100;
 }
+.skip-link:focus { top: 0; }
+*:focus { outline: 3px solid var(--color-accent-yellow); outline-offset: 2px; }
+*:focus:not(:focus-visible) { outline: none; }
 
-.skip-link:focus {
-    top: 0;
-}
-
-/* Focus visível */
-*:focus {
-    outline: 3px solid var(--color-primary);
-    outline-offset: 2px;
-}
-
-/* Remover outline apenas para mouse */
-*:focus:not(:focus-visible) {
-    outline: none;
+/* ========================================
+   Layout do Dashboard
+   ======================================== */
+.dashboard-container {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-rows: 100vh;
 }
 
 /* ========================================
-   Header
+   Sidebar (Navegação)
    ======================================== */
-header {
-    background: var(--color-primary);
-    color: white;
-    padding: var(--spacing-md) var(--spacing-lg);
-    text-align: center;
-    box-shadow: var(--shadow-md);
+nav#navigation {
+    grid-column: 1 / 2;
+    background: var(--bg-secondary); /* Fundo Oliva */
+    color: var(--text-on-secondary); /* Texto Escuro */
+    border-right: 2px solid var(--border-color);
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
 }
 
-header h1 {
+.sidebar-header {
+    padding-bottom: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--color-bg-dark); /* Borda escura */
+}
+.sidebar-header h2 {
+    color: var(--color-bg-dark);
     font-size: var(--font-size-xl);
-    margin-bottom: var(--spacing-xs);
 }
-
-header .subtitle {
-    font-size: var(--font-size-base);
-    opacity: 0.9;
-}
-
-/* ========================================
-   Barra de Status
-   ======================================== */
-.status-bar {
-    background: var(--bg-tertiary);
-    padding: var(--spacing-xs) var(--spacing-lg);
-    text-align: center;
-    font-weight: 500;
-    border-bottom: 2px solid var(--border-color);
-}
-
-.status-bar.success {
-    background: #d1fae5;
-    color: #065f46;
-}
-
-.status-bar.error {
-    background: #fee2e2;
-    color: #991b1b;
-}
-
-.status-bar.info {
-    background: #dbeafe;
-    color: #1e40af;
-}
-
-/* ========================================
-   Navegação
-   ======================================== */
-nav {
-    background: var(--bg-primary);
-    border-bottom: 1px solid var(--border-color);
-    padding: 0 var(--spacing-lg);
+.sidebar-header p {
+    color: var(--text-tertiary);
+    font-size: 14px;
 }
 
 nav ul {
     list-style: none;
     display: flex;
-    gap: var(--spacing-sm);
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    flex-grow: 1;
 }
-
-nav li {
-    margin: 0;
-}
+nav li { margin: 0; }
 
 nav a {
     display: block;
     padding: var(--spacing-sm) var(--spacing-md);
     text-decoration: none;
-    color: var(--text-secondary);
+    color: var(--text-on-secondary); /* Texto escuro */
     font-weight: 500;
-    border-bottom: 3px solid transparent;
+    border-radius: var(--border-radius);
+    border-left: 4px solid transparent;
     transition: all 0.2s;
 }
 
 nav a:hover {
-    color: var(--color-primary);
-    background: var(--bg-secondary);
+    color: var(--color-bg-dark);
+    background: var(--bg-tertiary); /* Oliva mais claro */
 }
 
 nav a[aria-current="page"] {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
+    color: var(--color-bg-dark);
+    background: var(--color-accent-yellow); /* Amarelo */
+    border-left-color: var(--color-bg-dark);
+}
+
+.sidebar-footer {
+    color: var(--text-tertiary);
+    font-size: 14px;
+    text-align: center;
 }
 
 /* ========================================
-   Main Content
+   Área de Conteúdo Principal (Direita)
    ======================================== */
-main {
-    flex: 1;
-    max-width: 1200px;
-    width: 100%;
-    margin: 0 auto;
+.main-content-wrapper {
+    grid-column: 2 / 3;
+    overflow-y: auto;
     padding: var(--spacing-lg);
+    background-color: var(--bg-primary); /* Fundo Escuro */
 }
 
-.content-section {
-    background: var(--bg-primary);
+header {
+    background: none;
+    color: var(--text-primary);
+    padding: 0 0 var(--spacing-md) 0;
+    text-align: left;
+    border-bottom: 2px solid var(--bg-secondary); /* Borda Oliva */
+    margin-bottom: var(--spacing-lg);
+    
+    /* Centralização do Header */
+    max-width: 1200px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+header h1 {
+    font-size: var(--font-size-xl);
+    margin-bottom: 0;
+    color: var(--color-primary-orange); /* Laranja */
+}
+header .subtitle {
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+    opacity: 0.8;
+}
+
+/* Centralização do <main> e .status-bar */
+main {
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto; /* Centraliza o <main> */
+    padding: 0;
+}
+
+.status-bar {
+    background: var(--bg-secondary);
+    color: var(--text-on-secondary);
+    padding: var(--spacing-xs) var(--spacing-lg);
+    text-align: center;
+    font-weight: 500;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-lg);
+    
+    /* Alinha com o 'main' */
+    max-width: 1200px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+.status-bar.success { background: #10b981; color: white; }
+.status-bar.error { background: #ef4444; color: white; }
+.status-bar.info { background: #3b82f6; color: white; }
+
+
+/* "Cards" do Dashboard */
+.content-section,
+fieldset,
+.config-section {
+    background: var(--bg-secondary); /* Fundo Oliva */
+    color: var(--text-on-secondary); /* Texto Escuro */
     border-radius: var(--border-radius);
     padding: var(--spacing-lg);
     box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-color);
+    margin-bottom: var(--spacing-lg);
 }
 
-.content-section[hidden] {
-    display: none;
-}
+.content-section[hidden] { display: none; }
 
 .content-section h2 {
     font-size: var(--font-size-xl);
     margin-bottom: var(--spacing-md);
-    color: var(--color-primary);
+    color: var(--text-on-secondary);
+    border-bottom: 1px solid var(--text-tertiary);
+    padding-bottom: var(--spacing-sm);
 }
-
 .content-section h3 {
     font-size: var(--font-size-lg);
     margin-top: var(--spacing-md);
     margin-bottom: var(--spacing-sm);
+    color: var(--text-on-secondary);
 }
 
 /* ========================================
-   Formulários
+   Formulários (Estilo "Dark on Olive")
    ======================================== */
 .form-description {
-    color: var(--text-secondary);
+    color: var(--text-tertiary);
     margin-bottom: var(--spacing-md);
     font-size: 15px;
 }
 
-fieldset {
-    border: 2px solid var(--border-color);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-md);
-}
+fieldset { border-width: 1px; }
 
 legend {
     font-weight: 600;
     padding: 0 var(--spacing-xs);
-    color: var(--color-primary);
+    color: var(--text-on-secondary);
+    font-size: var(--font-size-lg);
 }
 
-.form-group {
-    margin-bottom: var(--spacing-md);
-}
+.form-group { margin-bottom: var(--spacing-md); }
 
 .form-group label {
     display: block;
     font-weight: 500;
     margin-bottom: var(--spacing-xs);
-    color: var(--text-primary);
+    color: var(--text-on-secondary);
 }
 
 .help-text {
@@ -265,30 +295,33 @@ legend {
     font-weight: normal;
 }
 
+/* Adicionado input[type="password"] */
 input[type="number"],
 input[type="text"],
+input[type="password"],
 textarea,
 select {
     width: 100%;
     padding: var(--spacing-xs) var(--spacing-sm);
-    border: 2px solid var(--border-color);
+    border: 2px solid var(--text-tertiary);
     border-radius: var(--border-radius);
     font-size: var(--font-size-base);
     font-family: var(--font-family);
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, background-color 0.2s;
+    background-color: var(--color-text-beige); /* Fundo Bege */
+    color: var(--color-bg-dark); /* Texto Escuro */
 }
 
 input[type="number"]:focus,
 input[type="text"]:focus,
+input[type="password"]:focus,
 textarea:focus,
 select:focus {
-    border-color: var(--color-primary);
+    border-color: var(--color-primary-orange);
+    background-color: #ffffff;
 }
 
-textarea {
-    resize: vertical;
-    min-height: 100px;
-}
+textarea { resize: vertical; min-height: 100px; }
 
 /* Checkboxes e Radios */
 .checkbox-group,
@@ -302,7 +335,14 @@ textarea {
 .radio-item {
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs);
+    border-radius: var(--border-radius);
+    transition: background-color 0.2s;
+}
+.checkbox-item:hover,
+.radio-item:hover {
+    background-color: var(--bg-tertiary); /* Oliva claro */
 }
 
 input[type="checkbox"],
@@ -310,6 +350,8 @@ input[type="radio"] {
     width: 20px;
     height: 20px;
     cursor: pointer;
+    flex-shrink: 0;
+    accent-color: var(--color-primary-orange);
 }
 
 .checkbox-item label,
@@ -317,10 +359,11 @@ input[type="radio"] {
     cursor: pointer;
     font-weight: normal;
     margin: 0;
+    color: var(--text-on-secondary);
 }
 
 /* ========================================
-   Botões
+   Botões (Laranja e Amarelo)
    ======================================== */
 .button-group {
     display: flex;
@@ -342,93 +385,67 @@ input[type="radio"] {
     justify-content: center;
     gap: var(--spacing-xs);
 }
-
-.btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-primary {
-    background: var(--color-primary);
-    color: white;
+    background: var(--color-primary); /* Laranja */
+    color: var(--color-primary-text);
 }
-
 .btn-primary:hover:not(:disabled) {
-    background: var(--color-primary-dark);
+    background: var(--color-primary-hover); /* Amarelo */
 }
 
 .btn-secondary {
-    background: var(--color-secondary);
-    color: white;
+    background: var(--color-secondary); /* Amarelo */
+    color: var(--color-secondary-text);
 }
-
 .btn-secondary:hover:not(:disabled) {
-    background: #475569;
+    background: var(--color-secondary-hover); /* Bege */
 }
 
 .btn-success {
     background: var(--color-success);
     color: white;
 }
+.btn-success:hover:not(:disabled) { background: #059669; }
 
-.btn-success:hover:not(:disabled) {
-    background: #059669;
+.btn-danger {
+    background: var(--color-danger);
+    color: white;
+}
+.btn-danger:hover:not(:disabled) {
+    background: #dc2626; /* Darker red */
 }
 
 /* ========================================
-   Área de Resultado
+   Área de Resultado (Dentro do Card Oliva)
    ======================================== */
 .resultado-area {
     margin-top: var(--spacing-lg);
     padding-top: var(--spacing-lg);
-    border-top: 2px solid var(--border-color);
-}
-
-.texto-boletim {
-    margin-bottom: var(--spacing-lg);
-}
-
-.texto-boletim label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: var(--spacing-xs);
-}
-
-.texto-boletim textarea {
-    min-height: 300px;
-    font-size: 15px;
-    line-height: 1.8;
+    border-top: 2px solid var(--text-tertiary);
 }
 
 .texto-boletim textarea[readonly] {
-    background: var(--bg-secondary);
+    background: var(--bg-tertiary); /* Oliva claro */
     cursor: default;
 }
 
-/* ========================================
-   Player de Áudio
-   ======================================== */
+/* Player de Áudio */
 .audio-player {
-    background: var(--bg-secondary);
+    background: var(--bg-tertiary); /* Oliva claro */
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
     margin-top: var(--spacing-md);
+    border: 1px solid var(--text-tertiary);
 }
-
 .audio-player h4 {
     margin-bottom: var(--spacing-sm);
+    color: var(--text-on-secondary);
 }
 
-#audio-element {
-    width: 100%;
-    margin-bottom: var(--spacing-sm);
-}
-
-.audio-actions {
-    display: flex;
-    gap: var(--spacing-sm);
-    flex-wrap: wrap;
-}
+#audio-element { width: 100%; margin-bottom: var(--spacing-sm); }
+.audio-actions { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
 
 /* ========================================
    Loading
@@ -445,102 +462,158 @@ input[type="radio"] {
 .spinner {
     width: 60px;
     height: 60px;
-    border: 6px solid var(--bg-tertiary);
-    border-top-color: var(--color-primary);
+    border: 6px solid var(--text-tertiary);
+    border-top-color: var(--color-primary-orange);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .loading p {
     margin-top: var(--spacing-md);
     font-weight: 600;
-    color: var(--text-secondary);
+    color: var(--text-on-secondary);
 }
 
 /* ========================================
-   Configurações
+   Configurações e Ajuda
    ======================================== */
-.config-section {
-    margin-bottom: var(--spacing-xl);
-    padding: var(--spacing-md);
-    background: var(--bg-secondary);
-    border-radius: var(--border-radius);
-}
-
-.config-section h3 {
-    margin-top: 0;
-    color: var(--color-primary);
-}
+.config-section h3 { margin-top: 0; color: var(--text-on-secondary); }
 
 .info-box {
     background: var(--bg-tertiary);
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
     margin-top: var(--spacing-md);
-    border-left: 4px solid var(--color-primary);
+    border-left: 4px solid var(--color-primary-orange);
 }
-
-.info-box p {
-    margin: 0;
-}
-
-/* ========================================
-   Ajuda
-   ======================================== */
-.shortcuts-list {
-    background: var(--bg-secondary);
-    padding: var(--spacing-md);
-    border-radius: var(--border-radius);
-    margin-top: var(--spacing-sm);
-}
+.info-box p { margin: 0; color: var(--text-on-secondary); }
 
 .shortcuts-list dt {
     font-weight: 600;
-    color: var(--color-primary);
+    color: var(--color-bg-dark);
     margin-top: var(--spacing-sm);
 }
-
 .shortcuts-list dd {
     margin-left: var(--spacing-md);
-    color: var(--text-secondary);
+    color: var(--text-tertiary);
 }
 
 /* ========================================
-   Footer
+   Footer (Dentro do conteúdo)
    ======================================== */
 footer {
-    background: var(--bg-primary);
-    border-top: 1px solid var(--border-color);
-    padding: var(--spacing-md);
+    background: none;
+    border-top: 1px solid var(--bg-secondary);
+    padding: var(--spacing-md) 0;
     text-align: center;
-    color: var(--text-secondary);
+    color: var(--text-primary); /* Texto claro no fundo escuro */
     margin-top: var(--spacing-lg);
+    font-size: 14px;
+    
+    /* Centralização do Footer */
+    max-width: 1200px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 /* ========================================
-   Responsividade
+   Fase 2: Tabela de Histórico
    ======================================== */
-@media (max-width: 768px) {
-    :root {
-        --font-size-base: 14px;
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--spacing-md);
+    font-size: 15px;
+}
+
+.history-table thead {
+    background-color: var(--bg-tertiary); /* Oliva claro */
+}
+
+.history-table th {
+    padding: var(--spacing-sm) var(--spacing-md);
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-on-secondary);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.history-table tbody tr {
+    transition: background-color 0.2s;
+    border-bottom: 1px solid var(--text-tertiary);
+}
+
+.history-table tbody tr:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.history-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    vertical-align: middle;
+}
+
+/* Botões pequenos para a tabela */
+.btn-sm {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 14px;
+}
+
+.button-group-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+/* ========================================
+   Responsividade (Layout de App)
+   ======================================== */
+@media (max-width: 900px) {
+    .dashboard-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+        min-height: 100vh;
     }
     
+    nav#navigation {
+        grid-row: 1 / 2;
+        grid-column: 1 / 2;
+        padding: var(--spacing-sm);
+        flex-direction: row;
+        align-items: center;
+        border-right: none;
+        border-bottom: 2px solid var(--border-color);
+    }
+    .sidebar-header {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    .sidebar-header p, .sidebar-footer {
+        display: none;
+    }
     nav ul {
-        flex-direction: column;
+        flex-direction: row;
+        flex-grow: 0;
         gap: 0;
     }
-    
     nav a {
-        border-bottom: none;
-        border-left: 3px solid transparent;
+        padding: var(--spacing-sm);
+        border-left: none;
+        border-bottom: 3px solid transparent;
     }
-    
     nav a[aria-current="page"] {
-        border-left-color: var(--color-primary);
+        border-bottom-color: var(--color-bg-dark);
+        background: var(--color-accent-yellow);
+    }
+
+    .main-content-wrapper {
+        grid-row: 2 / 3;
+        grid-column: 1 / 2;
+        padding: var(--spacing-md);
+        overflow-y: visible;
     }
     
     .button-group {
@@ -549,6 +622,51 @@ footer {
     
     .btn {
         width: 100%;
+    }
+
+    /* Centralização no mobile */
+    header, main, .status-bar, footer {
+        max-width: 100%;
+    }
+    
+    /* Tabela Responsiva */
+    .history-table thead {
+        display: none; /* Esconde cabeçalho no mobile */
+    }
+    
+    .history-table tr {
+        display: block;
+        margin-bottom: var(--spacing-md);
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius);
+        overflow: hidden;
+    }
+    
+    .history-table td {
+        display: block;
+        text-align: right; /* Alinha valor à direita */
+        padding-left: 50%; /* Cria espaço para o label */
+        position: relative;
+        border-bottom: 1px solid var(--text-tertiary);
+    }
+    
+    .history-table td:last-child {
+        border-bottom: none;
+    }
+    
+    .history-table td::before {
+        content: attr(data-label); /* Puxa o label do HTML */
+        position: absolute;
+        left: var(--spacing-md);
+        width: 45%;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-on-secondary);
+    }
+
+    .button-group-vertical {
+        flex-direction: row; /* Botões lado a lado no mobile */
+        justify-content: flex-end; /* Alinha à direita */
     }
 }
 

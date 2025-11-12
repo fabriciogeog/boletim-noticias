@@ -7,309 +7,387 @@
     <title>Boletim de Notícias - Sistema de Geração</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
-    <!-- Skip Links para Acessibilidade -->
+<body class="dashboard-layout">
+
     <a href="#main-content" class="skip-link">Pular para conteúdo principal</a>
     <a href="#navigation" class="skip-link">Pular para navegação</a>
 
-    <!-- Header -->
-    <header role="banner">
-        <h1>Sistema de Boletim de Notícias</h1>
-        <p class="subtitle">Geração automática de boletins com IA</p>
-    </header>
+    <div class="dashboard-container">
 
-    <!-- Barra de Status com Feedback Sonoro -->
-    <div id="status-bar" role="status" aria-live="polite" aria-atomic="true" class="status-bar">
-        <span id="status-message">Sistema pronto</span>
-    </div>
-
-    <!-- Navegação Principal -->
-    <nav id="navigation" role="navigation" aria-label="Menu principal">
-        <ul>
-            <li><a href="#gerar" aria-current="page">Gerar Boletim</a></li>
-            <li><a href="#historico">Histórico</a></li>
-            <li><a href="#configuracoes">Configurações</a></li>
-            <li><a href="#ajuda">Ajuda</a></li>
-        </ul>
-    </nav>
-
-    <!-- Conteúdo Principal -->
-    <main id="main-content" role="main">
-        
-        <!-- Seção: Gerar Boletim -->
-        <section id="gerar" class="content-section active" aria-labelledby="gerar-title">
-            <h2 id="gerar-title">Gerar Novo Boletim</h2>
-            
-            <form id="boletim-form" aria-describedby="form-description">
-                <p id="form-description" class="form-description">
-                    Configure as opções do seu boletim de notícias. Use Tab para navegar entre os campos.
-                </p>
-
-                <!-- Categorias -->
-                <fieldset>
-                    <legend>Categorias de Notícias</legend>
-                    <div class="checkbox-group" role="group" aria-labelledby="categorias-legend">
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="cat-geral" name="categories" value="geral" checked>
-                            <label for="cat-geral">Geral</label>
-                        </div>
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="cat-politica" name="categories" value="politica">
-                            <label for="cat-politica">Política</label>
-                        </div>
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="cat-economia" name="categories" value="economia">
-                            <label for="cat-economia">Economia</label>
-                        </div>
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="cat-esportes" name="categories" value="esportes">
-                            <label for="cat-esportes">Esportes</label>
-                        </div>
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="cat-tecnologia" name="categories" value="tecnologia">
-                            <label for="cat-tecnologia">Tecnologia</label>
-                        </div>
-                    </div>
-                </fieldset>
-
-                <!-- Número de Notícias -->
-                <div class="form-group">
-                    <label for="num-articles">
-                        Número de Notícias
-                        <span class="help-text" id="num-articles-help">(Recomendado: 5-10)</span>
-                    </label>
-                    <input 
-                        type="number" 
-                        id="num-articles" 
-                        name="num_articles" 
-                        value="8" 
-                        min="3" 
-                        max="20"
-                        aria-describedby="num-articles-help"
-                        required
-                    >
-                </div>
-
-                <!-- Estilo -->
-                <fieldset>
-                    <legend>Estilo de Apresentação</legend>
-                    <div class="radio-group" role="radiogroup" aria-labelledby="estilo-legend">
-                        <div class="radio-item">
-                            <input type="radio" id="style-jornalistico" name="style" value="jornalistico" checked>
-                            <label for="style-jornalistico">
-                                Jornalístico (Formal e Profissional)
-                            </label>
-                        </div>
-                        <div class="radio-item">
-                            <input type="radio" id="style-conversacional" name="style" value="conversacional">
-                            <label for="style-conversacional">
-                                Conversacional (Amigável e Natural)
-                            </label>
-                        </div>
-                    </div>
-                </fieldset>
-
-                <!-- Opções Adicionais -->
-                <fieldset>
-                    <legend>Opções Adicionais</legend>
-                    <div class="checkbox-group">
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="include-intro" name="include_intro" checked>
-                            <label for="include-intro">Incluir Introdução</label>
-                        </div>
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="include-outro" name="include_outro" checked>
-                            <label for="include-outro">Incluir Encerramento</label>
-                        </div>
-                    </div>
-                </fieldset>
-
-                <!-- Botões de Ação -->
-                <div class="button-group">
-                    <button 
-                        type="submit" 
-                        id="btn-gerar" 
-                        class="btn btn-primary"
-                        aria-label="Gerar boletim com as configurações selecionadas"
-                    >
-                        Gerar Boletim (Ctrl+Enter)
-                    </button>
-                    <button 
-                        type="button" 
-                        id="btn-limpar" 
-                        class="btn btn-secondary"
-                        aria-label="Limpar formulário"
-                    >
-                        Limpar
-                    </button>
-                </div>
-            </form>
-
-            <!-- Área de Resultado -->
-            <div id="resultado" class="resultado-area" aria-live="polite" aria-atomic="true" hidden>
-                <h3>Boletim Gerado</h3>
-                
-                <!-- Texto do Boletim -->
-                <div class="texto-boletim">
-                    <label for="texto-gerado">Texto do Boletim:</label>
-                    <textarea 
-                        id="texto-gerado" 
-                        rows="15" 
-                        aria-label="Texto do boletim gerado. Você pode editar antes de gerar o áudio."
-                        readonly
-                    ></textarea>
-                    <button 
-                        type="button" 
-                        id="btn-editar-texto" 
-                        class="btn btn-secondary"
-                        aria-label="Habilitar edição do texto"
-                    >
-                        Editar Texto (Ctrl+E)
-                    </button>
-                </div>
-
-                <!-- Player de Áudio -->
-                <div id="audio-player" class="audio-player" hidden>
-                    <h4>Áudio Gerado</h4>
-                    <audio 
-                        id="audio-element" 
-                        controls 
-                        preload="metadata"
-                        aria-label="Player de áudio do boletim gerado"
-                    >
-                        Seu navegador não suporta o elemento de áudio.
-                    </audio>
-                    <div class="audio-actions">
-                        <button 
-                            type="button" 
-                            id="btn-download" 
-                            class="btn btn-success"
-                            aria-label="Baixar arquivo de áudio"
-                        >
-                            Baixar Áudio (Ctrl+D)
-                        </button>
-                        <button 
-                            type="button" 
-                            id="btn-regenerar-audio" 
-                            class="btn btn-secondary"
-                            aria-label="Regenerar áudio com texto editado"
-                        >
-                            Regenerar Áudio
-                        </button>
-                        <button 
-                            type="button" 
-                            id="btn-test-audio" 
-                            class="btn btn-secondary"
-                            aria-label="Testar último áudio"
-                            style="display:none;"
-                        >
-                            🔧 Testar Player
-                        </button>
-                    </div>
-                </div>
+        <nav id="navigation" role="navigation" aria-label="Menu principal">
+            <div class="sidebar-header">
+                <h2>Boletim.IA</h2>
+                <p>Painel de Geração</p>
             </div>
-
-            <!-- Indicador de Carregamento -->
-            <div id="loading" class="loading" hidden role="alert" aria-live="assertive">
-                <div class="spinner" aria-hidden="true"></div>
-                <p id="loading-message">Gerando boletim, aguarde...</p>
-            </div>
-        </section>
-
-        <!-- Seção: Histórico (placeholder) -->
-        <section id="historico" class="content-section" aria-labelledby="historico-title" hidden>
-            <h2 id="historico-title">Histórico de Boletins</h2>
-            <p>Em desenvolvimento...</p>
-        </section>
-
-        <!-- Seção: Configurações -->
-        <section id="configuracoes" class="content-section" aria-labelledby="config-title" hidden>
-            <h2 id="config-title">Configurações</h2>
-            
-            <div class="config-section">
-                <h3>Modelo de Linguagem (LLM)</h3>
-                <p class="form-description">Selecione qual modelo Ollama usar para sumarização de notícias.</p>
-                
-                <div class="form-group">
-                    <label for="model-select">Modelo Ollama:</label>
-                    <select id="model-select" aria-label="Selecionar modelo Ollama">
-                        <option value="">Carregando modelos...</option>
-                    </select>
-                    <button 
-                        type="button" 
-                        id="btn-refresh-models" 
-                        class="btn btn-secondary"
-                        aria-label="Atualizar lista de modelos"
-                        style="margin-top: 10px;"
-                    >
-                        Atualizar Lista
-                    </button>
-                </div>
-                
-                <div id="model-info" class="info-box" hidden>
-                    <p><strong>Modelo atual:</strong> <span id="current-model">-</span></p>
-                </div>
-                
-                <button 
-                    type="button" 
-                    id="btn-save-model" 
-                    class="btn btn-primary"
-                    aria-label="Salvar modelo selecionado"
-                >
-                    Salvar Configuração
-                </button>
-            </div>
-            
-            <div class="config-section">
-                <h3>Outras Configurações</h3>
-                <p class="form-description">Mais opções em desenvolvimento...</p>
-            </div>
-        </section>
-
-        <!-- Seção: Ajuda -->
-        <section id="ajuda" class="content-section" aria-labelledby="ajuda-title" hidden>
-            <h2 id="ajuda-title">Ajuda e Atalhos</h2>
-            
-            <h3>Atalhos de Teclado</h3>
-            <dl class="shortcuts-list">
-                <dt>Ctrl + Enter</dt>
-                <dd>Gerar boletim</dd>
-                
-                <dt>Ctrl + E</dt>
-                <dd>Editar texto do boletim</dd>
-                
-                <dt>Ctrl + D</dt>
-                <dd>Baixar áudio gerado</dd>
-                
-                <dt>Alt + 1</dt>
-                <dd>Ir para Gerar Boletim</dd>
-                
-                <dt>Alt + 2</dt>
-                <dd>Ir para Histórico</dd>
-                
-                <dt>Alt + 3</dt>
-                <dd>Ir para Configurações</dd>
-                
-                <dt>Alt + 4</dt>
-                <dd>Ir para Ajuda</dd>
-            </dl>
-
-            <h3>Navegação</h3>
             <ul>
-                <li><strong>Tab:</strong> Navegar para próximo elemento</li>
-                <li><strong>Shift + Tab:</strong> Navegar para elemento anterior</li>
-                <li><strong>Enter/Espaço:</strong> Ativar botões e checkboxes</li>
-                <li><strong>Setas:</strong> Navegar entre opções de rádio</li>
+                <li><a href="#gerar" aria-current="page">Gerar Boletim</a></li>
+                <li><a href="#historico">Histórico</a></li>
+                <li><a href="#configuracoes">Configurações</a></li>
+                <li><a href="#ajuda">Ajuda</a></li>
             </ul>
-        </section>
-    </main>
+            <div class="sidebar-footer">
+                <p>&copy; 2025</p>
+            </div>
+        </nav>
 
-    <!-- Footer -->
-    <footer role="contentinfo">
-        <p>&copy; 2024 Sistema de Boletim de Notícias | Desenvolvido com Acessibilidade</p>
-    </footer>
+        <div class="main-content-wrapper">
+            
+            <header role="banner">
+                <h1>Sistema de Boletim de Notícias</h1>
+                <p class="subtitle">Geração automática de boletins com IA</p>
+            </header>
 
-    <!-- Scripts -->
+            <main id="main-content" role="main">
+
+                <div id="status-bar" role="status" aria-live="polite" aria-atomic="true" class="status-bar">
+                    <span id="status-message">Sistema pronto</span>
+                </div>
+
+                <section id="gerar" class="content-section active" aria-labelledby="gerar-title">
+                    <h2 id="gerar-title">Gerar Novo Boletim</h2>
+                    
+                    <form id="boletim-form" aria-describedby="form-description">
+                        <p id="form-description">
+                            Configure as opções do seu boletim de notícias. Use Tab para navegar entre os campos.
+                        </p>
+
+                        <fieldset>
+                            <legend>Categorias de Notícias</legend>
+                            <div class="checkbox-group" role="group" aria-labelledby="categorias-legend">
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="cat-politica" name="categories" value="politica" checked>
+                                    <label for="cat-politica">Política Nacional</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="cat-futebol" name="categories" value="futebol">
+                                    <label for="cat-futebol">Futebol</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="cat-esportes" name="categories" value="esportes">
+                                    <label for="cat-esportes">Esportes (Outros)</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="cat-cultura" name="categories" value="cultura">
+                                    <label for="cat-cultura">Cultura/Entretenimento</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="cat-economia" name="categories" value="economia">
+                                    <label for="cat-economia">Economia</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="cat-geral" name="categories" value="geral">
+                                    <label for="cat-geral">Geral</label>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <div class="form-group">
+                            <label for="num-articles">
+                                Número de Notícias
+                                <span class="help-text" id="num-articles-help">(Recomendado: 5-10)</span>
+                            </label>
+                            <input 
+                                type="number" 
+                                id="num-articles" 
+                                name="num_articles" 
+                                value="8" 
+                                min="3" 
+                                max="20"
+                                aria-describedby="num-articles-help"
+                                required
+                            >
+                        </div>
+
+                        <fieldset>
+                            <legend>Estilo de Apresentação</legend>
+                            <div class="radio-group" role="radiogroup" aria-labelledby="estilo-legend">
+                                <div class="radio-item">
+                                    <input type="radio" id="style-jornalistico" name="style" value="jornalistico" checked>
+                                    <label for="style-jornalistico">
+                                        Jornalístico (Formal e Profissional)
+                                    </label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" id="style-conversacional" name="style" value="conversacional">
+                                    <label for="style-conversacional">
+                                        Conversacional (Amigável e Natural)
+                                    </label>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset>
+                            <legend>Opções Adicionais</legend>
+                            <div class="checkbox-group">
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="include-intro" name="include_intro" checked>
+                                    <label for="include-intro">Incluir Introdução</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="include-outro" name="include_outro" checked>
+                                    <label for="include-outro">Incluir Encerramento</label>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <div class="button-group">
+                            <button 
+                                type="submit" 
+                                id="btn-gerar" 
+                                class="btn btn-primary"
+                                aria-label="Gerar boletim com as configurações selecionadas"
+                            >
+                                Gerar Boletim (Ctrl+Enter)
+                            </button>
+                            <button 
+                                type="button" 
+                                id="btn-limpar" 
+                                class="btn btn-secondary"
+                                aria-label="Limpar formulário"
+                            >
+                                Limpar
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="resultado" class="resultado-area" aria-live="polite" aria-atomic="true" hidden>
+                        <h3>Boletim Gerado</h3>
+                        
+                        <div class="texto-boletim">
+                            <label for="texto-gerado">Texto do Boletim:</label>
+                            <textarea 
+                                id="texto-gerado" 
+                                rows="15" 
+                                aria-label="Texto do boletim gerado. Você pode editar antes de gerar o áudio."
+                                readonly
+                            ></textarea>
+                            <div class="button-group" style="margin-top: 1rem;">
+                                <button 
+                                    type="button" 
+                                    id="btn-editar-texto" 
+                                    class="btn btn-secondary"
+                                    aria-label="Habilitar edição do texto"
+                                >
+                                    Editar Texto (Ctrl+E)
+                                </button>
+                                
+                                <button 
+                                    type="button" 
+                                    id="btn-copiar-texto" 
+                                    class="btn btn-secondary"
+                                    aria-label="Copiar texto para área de transferência"
+                                >
+                                    Copiar Texto
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="audio-player" class="audio-player" hidden>
+                            <h4>Áudio Gerado</h4>
+                            <audio 
+                                id="audio-element" 
+                                controls 
+                                preload="metadata"
+                                aria-label="Player de áudio do boletim gerado"
+                            >
+                                Seu navegador não suporta o elemento de áudio.
+                            </audio>
+                            <div class="audio-actions">
+                                <button 
+                                    type="button" 
+                                    id="btn-download" 
+                                    class="btn btn-success"
+                                    aria-label="Baixar arquivo de áudio"
+                                >
+                                    Baixar Áudio (Ctrl+D)
+                                </button>
+                                <button 
+                                    type="button" 
+                                    id="btn-regenerar-audio" 
+                                    class="btn btn-secondary"
+                                    aria-label="Regenerar áudio com texto editado"
+                                >
+                                    Regenerar Áudio
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="loading" class="loading" hidden role="alert" aria-live="assertive">
+                        <div class="spinner" aria-hidden="true"></div>
+                        <p id="loading-message">Gerando boletim, aguarde...</p>
+                    </div>
+                </section>
+
+                <section id="historico" class="content-section" aria-labelledby="historico-title" hidden>
+                    <h2 id="historico-title">Histórico de Boletins</h2>
+                    <p class="form-description">
+                        Consulte, ouça e gerencie todos os boletins gerados anteriormente.
+                    </p>
+                    
+                    <div class="button-group" style="margin-bottom: 1rem;">
+                        <button type="button" id="btn-atualizar-historico" class="btn btn-primary">
+                            Atualizar Histórico
+                        </button>
+                    </div>
+
+                    <div id="historico-container">
+                        <div id="historico-loading" class="loading" hidden>
+                            <div class="spinner"></div>
+                            <p>Carregando histórico...</p>
+                        </div>
+                        <table class="history-table" id="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Categorias</th>
+                                    <th>Texto (Início)</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historico-tabela-corpo">
+                                </tbody>
+                        </table>
+                    </div>
+                    
+                    <div id="historico-audio-player" class="audio-player" hidden>
+                        <h4>Ouvindo Histórico</h4>
+                        <audio id="historico-audio-element" controls preload="metadata">
+                            Seu navegador não suporta o elemento de áudio.
+                        </audio>
+                    </div>
+
+                </section>
+
+                <section id="configuracoes" class="content-section" aria-labelledby="config-title" hidden>
+                    <h2 id="config-title">Configurações</h2>
+                    
+                    <form id="config-form">
+                        <fieldset>
+                            <legend>Chave de API (GNews.io)</legend>
+                            <p class="form-description">
+                                Insira sua chave de API do GNews.io. Necessária para coletar notícias.
+                            </p>
+                            <div class="form-group">
+                                <label for="config-api-key">GNEWS_API_KEY:</label>
+                                <input type="password" id="config-api-key" aria-describedby="api-key-help">
+                                <span class="help-text" id="api-key-help">
+                                    Sua chave é salva localmente no arquivo <code>.env</code> do servidor.
+                                </span>
+                            </div>
+                        </fieldset>
+
+                        <fieldset>
+                            <legend>Configuração de Voz (gTTS)</legend>
+                            <p class="form-description">
+                                Selecione o sotaque (TLD) para a voz do Google (gTTS).
+                            </p>
+                            <div class="form-group">
+                                <label for="config-tld-select">Sotaque da Voz:</label>
+                                <select id="config-tld-select" aria-label="Selecionar sotaque da voz">
+                                    <option value="com.br">Português (Brasil)</option>
+                                    <option value="pt">Português (Portugal)</option>
+                                    <option value="com">Inglês (EUA / Google.com)</option>
+                                </select>
+                            </div>
+                        </fieldset>
+
+                        <fieldset>
+                            <legend>Sumarização com IA (Ollama)</legend>
+                            <p class="form-description">
+                                Habilitar o resumo com IA local (Ollama) requer hardware potente (16GB+ RAM)
+                                e que o branch <code>feature/ollama-ai</code> esteja em uso.
+                            </p>
+                            <div class="checkbox-group">
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="config-enable-ollama" disabled>
+                                    <label for="config-enable-ollama">Habilitar Ollama (Desabilitado nesta versão)</label>
+                                </div>
+                            </div>
+                        </fieldset>
+                        
+                        <div class="button-group">
+                            <button type="submit" id="btn-save-config" class="btn btn-primary">
+                                Salvar Configurações
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <section id="ajuda" class="content-section" aria-labelledby="ajuda-title" hidden>
+                    <h2 id="ajuda-title">Ajuda e Guia Rápido</h2>
+                    
+                    <p class="form-description">
+                        Este é o guia de usuário principal da aplicação.
+                    </p>
+
+                    <div class="config-section">
+                        <h3>🎯 Características Principais</h3>
+                        <ul>
+                            <li>✅ <strong>Coleta Automática de Notícias</strong> via API GNews.io</li>
+                            <li>🎙️ <strong>Geração de Áudio Rápida</strong> com Text-to-Speech via gTTS (Voz do Google)</li>
+                            <li>♿ <strong>100% Acessível</strong> com navegação por teclado e compatível com leitores de tela</li>
+                            <li>⚡ <strong>Extremamente Leve</strong> - Roda em qualquer máquina.</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="config-section">
+                        <h3>🔑 Requisito Obrigatório: Chave de API</h3>
+                        <p>Este sistema <strong>requer</strong> uma chave de API GNews.io válida para coletar notícias.</p>
+                        <p>
+                            Se você receber um erro de "Nenhuma notícia encontrada", 
+                            por favor, insira ou atualize sua chave de API na aba 
+                            <a href="#configuracoes" onclick="navigateToSection('configuracoes')"><strong>Configurações</strong></a>.
+                        </p>
+                    </div>
+
+                    <div class="config-section">
+                        <h3>🎮 Uso Básico (Interface Web)</h3>
+                        <ol>
+                            <li><strong>Configure</strong>: Marque as categorias desejadas (Política, Futebol, etc.).</li>
+                            <li><strong>Gere</strong>: Clique em "Gerar Boletim" (<code>Ctrl+Enter</code>).</li>
+                            <li><strong>Aguarde</strong>: ~5-10 segundos.</li>
+                            <li><strong>Edite</strong>: Se necessário, clique em "Editar Texto" (<code>Ctrl+E</code>).</li>
+                            <li><strong>Baixe</strong>: O MP3 gerado (<code>Ctrl+D</code>) para usar no seu programa!</li>
+                        </ol>
+                    </div>
+
+                    <div class="config-section">
+                        <h3>⌨️ Atalhos de Teclado</h3>
+                        <dl class="shortcuts-list">
+                            <dt>Ctrl + Enter</dt>
+                            <dd>Gerar boletim</dd>
+                            
+                            <dt>Ctrl + E</dt>
+                            <dd>Editar texto do boletim</dd>
+                            
+                            <dt>Ctrl + D</dt>
+                            <dd>Baixar áudio gerado</dd>
+                            
+                            <dt>Alt + 1</dt>
+                            <dd>Ir para Gerar Boletim</dd>
+                            
+                            <dt>Alt + 2</dt>
+                            <dd>Ir para Histórico</dd>
+                            
+                            <dt>Alt + 3</dt>
+                            <dd>Ir para Configurações</dd>
+                            
+                            <dt>Alt + 4</dt>
+                            <dd>Ir para Ajuda</dd>
+                        </dl>
+                    </div>
+                </section>
+
+            </main> 
+
+            <footer role="contentinfo">
+                <p>Boletim.IA v3.0 | Desenvolvido com Acessibilidade</p>
+            </footer>
+
+        </div> 
+    </div> 
+
     <script src="js/app.js"></script>
     <script src="js/accessibility.js"></script>
 </body>

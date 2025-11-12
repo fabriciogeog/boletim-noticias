@@ -40,13 +40,9 @@ class Boletim(Base):
     """
     __tablename__ = 'boletins'
     id = Column(Integer, primary_key=True)
-    # Data e hora que foi gerado
     timestamp = Column(DateTime, default=datetime.utcnow)
-    # O texto completo que foi gerado
     summary_text = Column(String, nullable=False)
-    # O nome do arquivo de áudio (ex: boletim_20251110_153000.mp3)
     audio_filename = Column(String, nullable=True)
-    # As categorias que o usuário selecionou (ex: "politica, futebol")
     categories = Column(String, nullable=True)
 
     def __repr__(self):

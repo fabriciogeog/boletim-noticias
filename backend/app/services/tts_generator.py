@@ -3,18 +3,13 @@ from typing import Optional, List
 import os
 from datetime import datetime
 from pathlib import Path
-import asyncio  # Importar asyncio para rodar Coqui em thread
+import asyncio
 
 # Imports dos motores TTS
 try:
     from gtts import gTTS
 except ImportError:
     gTTS = None
-
-try:
-    from TTS.api import TTS
-except ImportError:
-    TTS = None
 
 # Imports de áudio
 try:
@@ -27,68 +22,38 @@ logger = logging.getLogger(__name__)
 
 class TTSGenerator:
     """
-    Gerador de Text-to-Speech flexível.
-    Seleciona o motor (Coqui ou gTTS) baseado na variável de ambiente TTS_ENGINE.
+    Gerador de Text-to-Speech (Modo Leve).
+    Usa gTTS (online) como padrão.
     """
     
     def __init__(self):
         self.output_dir = Path("/app/audio")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        self.tts_engine_name = os.getenv("TTS_ENGINE", "gtts").lower()
-        self.tts_model = None
+        # Lemos o motor padrão do .env
+        self.default_tts_engine = os.getenv("TTS_ENGINE", "gtts").lower()
         self.gTTS_client = None
         
-        self._init_tts()
-    
-    def _init_tts(self):
-        """
-        Inicializa o motor TTS selecionado.
-        """
-        if self.tts_engine_name == "coqui":
-            if TTS:
-                try:
-                    model_name = "tts_models/multilingual/multi-dataset/your_tts"
-                    logger.info(f"Inicializando Coqui TTS (motor local) com modelo: {model_name}...")
-                    self.tts_model = TTS(model_name=model_name, progress_bar=True)
-                    logger.info("✓ Coqui TTS (local) inicializado com sucesso")
-                except Exception as e:
-                    logger.error(f"✗ Falha ao inicializar Coqui TTS: {e}")
-                    logger.warning("Alternando para gTTS como fallback.")
-                    self._init_gtts() # Tenta gTTS se Coqui falhar
-            else:
-                logger.error("Biblioteca 'TTS' (Coqui) não instalada.")
-                logger.warning("Alternando para gTTS como fallback.")
-                self._init_gtts()
-                
-        elif self.tts_engine_name == "gtts":
-            self._init_gtts()
-            
-        else:
-            logger.error(f"Motor TTS desconhecido: '{self.tts_engine_name}'. Usando gTTS.")
-            self._init_gtts()
-
-    def _init_gtts(self):
-        """Inicializa o gTTS como motor principal ou fallback."""
-        self.tts_engine_name = "gtts"
-        if gTTS:
+        if self.default_tts_engine == "gtts" and gTTS:
             self.gTTS_client = gTTS
-            logger.info("✓ Google TTS (gTTS - online) inicializado com sucesso")
+            logger.info("✓ Cliente Google TTS (gTTS) pronto.")
         else:
-            logger.error("gTTS não está instalado. Sistema funcionará sem geração de áudio.")
+            logger.error("gTTS não está instalado ou não foi selecionado. Geração de áudio falhará.")
 
+    
     def get_available_voices(self) -> List[str]:
-        """ Retorna lista de vozes (placeholder) """
-        if self.tts_engine_name == "coqui":
-            return ["default (coqui-your_tts)"]
-        else:
-            return ["default (gtts-br)", "pt", "com"]
+        # Esta função agora é um placeholder
+        return ["default (gtts-br)", "pt", "com"]
     
     async def generate(
         self,
         text: str,
-        voice_name: Optional[str] = None,
-        speed: float = 1.0
+        # ================================================================
+        # ESTA É A CORREÇÃO:
+        # A função agora aceita o argumento 'tld' (sotaque)
+        # ================================================================
+        tld: str = "com.br",
+        voice_name: Optional[str] = None # voice_name é mantido, mas 'tld' é priorizado
     ) -> str:
         """
         Gera áudio a partir do texto usando o motor selecionado.
@@ -96,7 +61,10 @@ class TTSGenerator:
         if not text:
             raise ValueError("Texto vazio fornecido")
         
-        logger.info(f"Gerando áudio com motor '{self.tts_engine_name}': {len(text)} caracteres")
+        # Decide qual motor usar. Padrão é 'gtts'
+        engine_to_use = self.default_tts_engine
+        
+        logger.info(f"Gerando áudio com motor '{engine_to_use}': {len(text)} caracteres")
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"boletim_{timestamp}.mp3"
@@ -105,19 +73,20 @@ class TTSGenerator:
         try:
             cleaned_text = self._prepare_text(text)
             
-            if self.tts_engine_name == "coqui" and self.tts_model:
-                temp_path = await self._generate_coqui(cleaned_text, output_path)
-            elif self.tts_engine_name == "gtts" and self.gTTS_client:
-                temp_path = await self._generate_gtts(cleaned_text, output_path)
+            # --- Roteador do Motor TTS ---
+            if engine_to_use == "gtts" and self.gTTS_client:
+                # Passamos o TLD (sotaque) para a função
+                temp_path = await self._generate_gtts(cleaned_text, output_path, tld)
             else:
-                logger.error("Nenhum motor TTS está disponível.")
+                logger.error(f"Nenhum motor TTS funcional foi encontrado ('{engine_to_use}').")
                 raise RuntimeError("Nenhum motor TTS disponível")
             
+            # --- Pós-processamento (Aceleração) ---
             if AudioSegment:
                 try:
                     logger.info("Aplicando aceleração de 10% (1.1x) no áudio...")
                     audio = AudioSegment.from_mp3(str(temp_path))
-                    speed_factor = 1.15 if self.tts_engine_name == "gtts" else 1.1
+                    speed_factor = 1.15 # Padrão gTTS
                     
                     faster_audio = audio.speedup(playback_speed=speed_factor)
                     faster_audio.export(str(output_path), format="mp3", bitrate="192k")
@@ -143,13 +112,14 @@ class TTSGenerator:
                 f.write(text)
             return str(text_path)
 
-    async def _generate_gtts(self, text: str, final_path: Path) -> Path:
+    async def _generate_gtts(self, text: str, final_path: Path, tld: str) -> Path:
         """ Lógica de geração do gTTS (online) """
-        logger.info("Gerando áudio com gTTS (tld=com.br, velocidade normal)...")
+        
+        logger.info(f"Gerando áudio com gTTS (tld={tld}, velocidade normal)...")
         tts = self.gTTS_client(
             text=text,
             lang='pt',
-            tld='com.br',
+            tld=tld, # <-- Usa o sotaque escolhido
             slow=False,
             lang_check=False
         )
@@ -160,31 +130,10 @@ class TTSGenerator:
         
         logger.info("Áudio gTTS intermediário salvo.")
         return temp_path
-
-    async def _generate_coqui(self, text: str, final_path: Path) -> Path:
-        """ Lógica de geração do Coqui TTS (local) """
-        logger.info("Gerando áudio com Coqui TTS (local)...")
-        
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None,
-            self.tts_model.tts_to_file,
-            text,
-            None,  # speaker
-            'pt-br',  # <-- ESTA É A CORREÇÃO: 'pt' -> 'pt-br'
-            str(final_path)
-        )
-        
-        if not final_path.exists():
-            logger.error("✗ Falha crítica: Coqui TTS (tts_to_file) não criou o arquivo de áudio.")
-            raise RuntimeError("Coqui TTS falhou em criar o arquivo")
-        
-        logger.info(f"✓ Áudio Coqui TTS salvo em: {final_path}")
-        return final_path
     
     def _prepare_text(self, text: str) -> str:
         """
-NORMALIZAÇÃO DE TEXTO (Mantida)
+        Prepara texto para TTS (normalização, limpeza)
         """
         text = text.replace('\n\n', '. ')
         text = text.replace('\n', ' ')
