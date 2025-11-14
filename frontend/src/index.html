@@ -15,7 +15,7 @@
     <div class="dashboard-container">
 
         <nav id="navigation" role="navigation" aria-label="Menu principal">
-            <div class="sidebar-header">
+            <div class.sidebar-header">
                 <h2>Boletim.IA</h2>
                 <p>Painel de Geração</p>
             </div>
@@ -34,7 +34,7 @@
             
             <header role="banner">
                 <h1>Sistema de Boletim de Notícias</h1>
-                <p class="subtitle">Geração automática de boletins com IA</p>
+                <p class="subtitle">Arquitetura Híbrida (Nuvem)</p>
             </header>
 
             <main id="main-content" role="main">
@@ -99,7 +99,10 @@
                         </div>
 
                         <fieldset>
-                            <legend>Estilo de Apresentação</legend>
+                            <legend>Estilo de Apresentação (IA)</legend>
+                            <p class="form-description">
+                                O estilo só é aplicado se a "Sumarização com IA (Nuvem)" estiver ativa nas Configurações.
+                            </p>
                             <div class="radio-group" role="radiogroup" aria-labelledby="estilo-legend">
                                 <div class="radio-item">
                                     <input type="radio" id="style-jornalistico" name="style" value="jornalistico" checked>
@@ -260,49 +263,61 @@
                 </section>
 
                 <section id="configuracoes" class="content-section" aria-labelledby="config-title" hidden>
-                    <h2 id="config-title">Configurações</h2>
+                    <h2 id="config-title">Configurações das APIs</h2>
                     
                     <form id="config-form">
+                        
                         <fieldset>
-                            <legend>Chave de API (GNews.io)</legend>
+                            <legend>Sumarização com IA (Google Gemini)</legend>
                             <p class="form-description">
-                                Insira sua chave de API do GNews.io. Necessária para coletar notícias.
+                                Para roteiros fluidos e com transições, use a IA do Gemini.
                             </p>
                             <div class="form-group">
-                                <label for="config-api-key">GNEWS_API_KEY:</label>
-                                <input type="password" id="config-api-key" aria-describedby="api-key-help">
-                                <span class="help-text" id="api-key-help">
-                                    Sua chave é salva localmente no arquivo <code>.env</code> do servidor.
+                                <label for="config-summary-mode">Modo de Sumarização:</label>
+                                <select id="config-summary-mode" aria-label="Selecionar modo de sumarização">
+                                    <option value="gemini">IA na Nuvem (Gemini - Padrão)</option>
+                                    <option value="none">Simples (Lista Rápida - Fallback)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="config-gemini-key">Chave da API (Gemini):</label>
+                                <input type="password" id="config-gemini-key" aria-describedby="gemini-key-help">
+                                <span class="help-text" id="gemini-key-help">
+                                    Obtenha sua chave no Google AI Studio.
+                                </span>
+                            </div>
+                        </fieldset>
+                        
+                        <fieldset>
+                            <legend>Configuração de Voz (TTS)</legend>
+                            <p class="form-description">
+                                Escolha o motor de voz para a geração do áudio.
+                            </p>
+                            <div class="form-group">
+                                <label for="config-tts-engine">Motor de Voz:</label>
+                                <select id="config-tts-engine" aria-label="Selecionar motor de voz">
+                                    <option value="gtts">Google TTS (Padrão, Rápido)</option>
+                                    <option value="elevenlabs">ElevenLabs (Alta Qualidade, Pago)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="config-elevenlabs-key">Chave da API (ElevenLabs):</label>
+                                <input type="password" id="config-elevenlabs-key" aria-describedby="elevenlabs-key-help">
+                                <span class="help-text" id="elevenlabs-key-help">
+                                    Obrigatório se o motor "ElevenLabs" for selecionado.
                                 </span>
                             </div>
                         </fieldset>
 
                         <fieldset>
-                            <legend>Configuração de Voz (gTTS)</legend>
+                            <legend>Coleta de Notícias (GNews.io)</legend>
                             <p class="form-description">
-                                Selecione o sotaque (TLD) para a voz do Google (gTTS).
+                                Chave de API necessária para coletar notícias.
                             </p>
                             <div class="form-group">
-                                <label for="config-tld-select">Sotaque da Voz:</label>
-                                <select id="config-tld-select" aria-label="Selecionar sotaque da voz">
-                                    <option value="com.br">Português (Brasil)</option>
-                                    <option value="pt">Português (Portugal)</option>
-                                    <option value="com">Inglês (EUA / Google.com)</option>
-                                </select>
-                            </div>
-                        </fieldset>
-
-                        <fieldset>
-                            <legend>Sumarização com IA (Ollama)</legend>
-                            <p class="form-description">
-                                Habilitar o resumo com IA local (Ollama) requer hardware potente (16GB+ RAM)
-                                e que o branch <code>feature/ollama-ai</code> esteja em uso.
-                            </p>
-                            <div class="checkbox-group">
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="config-enable-ollama" disabled>
-                                    <label for="config-enable-ollama">Habilitar Ollama (Desabilitado nesta versão)</label>
-                                </div>
+                                <label for="config-gnews-key">Chave da API (GNews.io):</label>
+                                <input type="password" id="config-gnews-key" aria-describedby="gnews-key-help">
                             </div>
                         </fieldset>
                         
@@ -324,29 +339,32 @@
                     <div class="config-section">
                         <h3>🎯 Características Principais</h3>
                         <ul>
-                            <li>✅ <strong>Coleta Automática de Notícias</strong> via API GNews.io</li>
-                            <li>🎙️ <strong>Geração de Áudio Rápida</strong> com Text-to-Speech via gTTS (Voz do Google)</li>
-                            <li>♿ <strong>100% Acessível</strong> com navegação por teclado e compatível com leitores de tela</li>
+                            <li>✅ <strong>Coleta de Notícias</strong> via API GNews.io</li>
+                            <li>🤖 <strong>Sumarização Inteligente</strong> (Opcional) via Google Gemini</li>
+                            <li>🎙️ <strong>Geração de Áudio</strong> via gTTS (Padrão) ou ElevenLabs (Premium)</li>
+                            <li>♿ <strong>100% Acessível</strong> com navegação por teclado</li>
                             <li>⚡ <strong>Extremamente Leve</strong> - Roda em qualquer máquina.</li>
                         </ul>
                     </div>
                     
                     <div class="config-section">
-                        <h3>🔑 Requisito Obrigatório: Chave de API</h3>
-                        <p>Este sistema <strong>requer</strong> uma chave de API GNews.io válida para coletar notícias.</p>
-                        <p>
-                            Se você receber um erro de "Nenhuma notícia encontrada", 
-                            por favor, insira ou atualize sua chave de API na aba 
+                        <h3>🔑 Requisito Obrigatório: Chaves de API</h3>
+                        <p>Este sistema <strong>requer</strong> chaves de API para funcionar, que devem ser inseridas na aba 
                             <a href="#configuracoes" onclick="navigateToSection('configuracoes')"><strong>Configurações</strong></a>.
                         </p>
+                        <ul>
+                            <li><strong>GNews.io (Essencial):</strong> Para coletar notícias.</li>
+                            <li><strong>Google Gemini (Opcional):</strong> Para a sumarização com IA.</li>
+                            <li><strong>ElevenLabs (Opcional):</strong> Para a voz de alta qualidade.</li>
+                        </ul>
                     </div>
 
                     <div class="config-section">
                         <h3>🎮 Uso Básico (Interface Web)</h3>
                         <ol>
-                            <li><strong>Configure</strong>: Marque as categorias desejadas (Política, Futebol, etc.).</li>
-                            <li><strong>Gere</strong>: Clique em "Gerar Boletim" (<code>Ctrl+Enter</code>).</li>
-                            <li><strong>Aguarde</strong>: ~5-10 segundos.</li>
+                            <li><strong>Configure</strong>: Insira suas chaves de API na aba "Configurações" e salve.</li>
+                            <li><strong>Gere</strong>: Na aba "Gerar Boletim", marque as categorias e clique em "Gerar".</li>
+                            <li><strong>Aguarde</strong>: ~10-20 segundos.</li>
                             <li><strong>Edite</strong>: Se necessário, clique em "Editar Texto" (<code>Ctrl+E</code>).</li>
                             <li><strong>Baixe</strong>: O MP3 gerado (<code>Ctrl+D</code>) para usar no seu programa!</li>
                         </ol>
@@ -382,7 +400,7 @@
             </main> 
 
             <footer role="contentinfo">
-                <p>Boletim.IA v3.0 | Desenvolvido com Acessibilidade</p>
+                <p>Boletim.IA v4.0 | Desenvolvido com Acessibilidade</p>
             </footer>
 
         </div> 

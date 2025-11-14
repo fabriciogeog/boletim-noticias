@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Boletim de Notícias API",
     description="API para coleta, sumarização e geração de áudio de notícias",
-    version="3.0.0 (Leve)",
+    version="4.0.0 (Híbrido)",
     on_startup=[init_db]
 )
 
@@ -48,18 +48,27 @@ news_collector = NewsCollector()
 summarizer = NewsSummarizer()
 tts_generator = TTSGenerator()
 
-# Modelos Pydantic
+# ================================================================
+# MODELOS PYDANTIC ATUALIZADOS
+# ================================================================
 class BoletimRequest(BaseModel):
     categories: List[str] = ["geral"]
     num_articles: int = 10
     style: str = "jornalistico"
     include_intro: bool = True
     include_outro: bool = True
-    tld: str = "com.br" 
+    
+    # Configs que vêm do .env/Configurações
+    summary_mode: str = "gemini"
+    tts_engine: str = "gtts"
+    tts_voice_id: str = "Adam"
+    tld: Optional[str] = "com.br" # <-- CORRIGIDO (Bug 422)
 
 class AudioRequest(BaseModel):
     text: str
-    tld: str = "com.br"
+    tts_engine: str = "gtts"
+    tts_voice_id: str = "Adam"
+    tld: Optional[str] = "com.br" # <-- CORRIGIDO (Bug 422)
 
 class BoletimResponse(BaseModel):
     id: int
@@ -71,13 +80,19 @@ class BoletimResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# --- Modelos Pydantic para Configuração ---
 class ConfigResponse(BaseModel):
     GNEWS_API_KEY: str
+    GEMINI_API_KEY: str
+    ELEVENLABS_API_KEY: str
+    AI_SUMMARY_MODE: str
     TTS_ENGINE: str
-    ENABLE_OLLAMA: str
 
 class ConfigSaveRequest(BaseModel):
     gnews_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+    elevenlabs_api_key: Optional[str] = None
+    ai_summary_mode: str
     tts_engine: str
 
 # Middleware do Banco de Dados
@@ -92,23 +107,20 @@ async def db_session_middleware(request: Request, call_next):
 async def root():
     return {
         "message": "Boletim de Notícias API",
-        "version": "3.0.0 (Leve)",
+        "version": "4.0.0 (Híbrido)",
         "status": "running"
     }
 
 @app.get("/health")
 async def health_check():
-    """Health check para Docker"""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
-    }
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 # --- Rotas de Geração ---
 @app.post("/api/generate-boletim", response_model=BoletimResponse)
 async def generate_boletim(request: BoletimRequest):
     try:
         logger.info("Iniciando geração de boletim completo")
+        
         articles = await news_collector.collect(
             categories=request.categories,
             limit=request.num_articles
@@ -120,13 +132,17 @@ async def generate_boletim(request: BoletimRequest):
             articles=articles,
             style=request.style,
             include_intro=request.include_intro,
-            include_outro=request.include_outro
+            include_outro=request.include_outro,
+            summary_mode=request.summary_mode
         )
         
         audio_path = await tts_generator.generate(
             text=summary_text,
+            tts_engine=request.tts_engine,
+            tts_voice_id=request.tts_voice_id,
             tld=request.tld
         )
+        
         audio_filename = os.path.basename(audio_path) if audio_path else None
         
         try:
@@ -140,6 +156,7 @@ async def generate_boletim(request: BoletimRequest):
             db_session.commit()
             logger.info(f"✓ Boletim salvo no histórico (ID: {novo_boletim.id})")
             return novo_boletim
+            
         except Exception as db_error:
             logger.error(f"✗ Erro ao salvar boletim no banco de dados: {db_error}")
             db_session.rollback()
@@ -150,6 +167,7 @@ async def generate_boletim(request: BoletimRequest):
                 audio_filename=audio_filename,
                 categories=", ".join(request.categories)
             )
+        
     except HTTPException as e:
         logger.error(f"Erro HTTP ao gerar boletim: {e.detail}")
         raise e
@@ -166,8 +184,11 @@ async def generate_audio_from_text(request: AudioRequest):
         
         audio_path = await tts_generator.generate(
             text=request.text,
+            tts_engine=request.tts_engine,
+            tts_voice_id=request.tts_voice_id,
             tld=request.tld
         )
+        
         audio_filename = os.path.basename(audio_path) if audio_path else None
         is_audio = audio_filename and audio_filename.endswith('.mp3')
         
@@ -183,6 +204,7 @@ async def generate_audio_from_text(request: AudioRequest):
             "download_url": f"/api/download/{audio_filename}",
             "audio_url": f"/api/download/{audio_filename}"
         }
+        
     except Exception as e:
         logger.error(f"Erro ao regenerar áudio: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -213,6 +235,9 @@ async def download_audio(filename: str):
 # --- Rotas do Histórico ---
 @app.get("/api/historico", response_model=List[BoletimResponse])
 async def get_historico():
+    """
+    Busca todos os boletins salvos no banco de dados.
+    """
     try:
         logger.info("Buscando histórico de boletins...")
         boletins = db_session.query(BoletimModel).order_by(BoletimModel.id.desc()).all()
@@ -223,6 +248,10 @@ async def get_historico():
 
 @app.delete("/api/historico/{boletim_id}", response_model=dict)
 async def delete_boletim(boletim_id: int):
+    """
+    Exclui um registro de boletim do banco de dados E
+    o arquivo de áudio associado do disco.
+    """
     try:
         logger.info(f"Tentando excluir boletim ID: {boletim_id}")
         
@@ -281,11 +310,14 @@ async def save_configuracoes(request: ConfigSaveRequest):
         logger.info("Salvando novas configurações no .env...")
         updates = {}
         
-        # Só atualiza a chave se o usuário enviou uma (não vazia)
-        if request.gnews_api_key and "..." not in request.gnews_api_key:
+        if request.gnews_api_key:
             updates['GNEWS_API_KEY'] = request.gnews_api_key
-            logger.info("Nova GNEWS_API_KEY será salva.")
+        if request.gemini_api_key:
+            updates['GEMINI_API_KEY'] = request.gemini_api_key
+        if request.elevenlabs_api_key:
+            updates['ELEVENLABS_API_KEY'] = request.elevenlabs_api_key
         
+        updates['AI_SUMMARY_MODE'] = request.ai_summary_mode
         updates['TTS_ENGINE'] = request.tts_engine
         
         success = env_manager.update_env_file(updates)
@@ -293,9 +325,10 @@ async def save_configuracoes(request: ConfigSaveRequest):
         if not success:
             raise HTTPException(status_code=500, detail="Erro ao salvar o arquivo .env no servidor.")
         
-        # Recarrega as variáveis de ambiente nos serviços
+        # Recarregar os serviços com as novas chaves/configurações
         news_collector.api_key = os.getenv("GNEWS_API_KEY")
-        tts_generator.default_tts_engine = os.getenv("TTS_ENGINE", "gtts")
+        summarizer.__init__()
+        tts_generator.__init__()
         
         return {"success": True, "message": "Configurações salvas!"}
         

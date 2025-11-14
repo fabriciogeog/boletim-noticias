@@ -4,18 +4,23 @@ from typing import Dict
 
 logger = logging.getLogger(__name__)
 
-# O .env está um nível ACIMA da pasta /app onde este script roda
-ENV_FILE_PATH = '../.env' 
+# ================================================================
+# CORREÇÃO: O .env está montado em /app/.env (dentro do workdir)
+# O caminho relativo correto é apenas '.env'
+# ================================================================
+ENV_FILE_PATH = '.env' 
 
 def load_env_variables() -> Dict[str, str]:
     """
-    Carrega variáveis específicas do .env para exibir no frontend.
+    Carrega variáveis do .env para exibir no frontend.
     Por segurança, a chave de API é 'mascarada'.
     """
     config = {
-        "GNEWS_API_KEY": "", # Placeholder
-        "TTS_ENGINE": "com.br", # Padrão
-        "ENABLE_OLLAMA": "false" # Padrão
+        "GNEWS_API_KEY": "",
+        "GEMINI_API_KEY": "",
+        "ELEVENLABS_API_KEY": "",
+        "AI_SUMMARY_MODE": "none",
+        "TTS_ENGINE": "gtts"
     }
     
     if not os.path.exists(ENV_FILE_PATH):
@@ -29,23 +34,22 @@ def load_env_variables() -> Dict[str, str]:
                 try:
                     key, value = line.split('=', 1)
                     key = key.strip()
-                    value = value.strip().strip("'\"") # Remove aspas
+                    value = value.strip().strip("'\"")
                     
-                    if key == 'GNEWS_API_KEY' and value:
-                        # Segurança: Nunca envie a chave completa para o frontend
-                        # Apenas enviamos um "indicador" de que ela está salva.
-                        config[key] = f"{value[:4]}... (Salva)" 
-                    elif key in config:
-                        config[key] = value
+                    if key in config:
+                        if "API_KEY" in key and value:
+                            config[key] = f"{value[:4]}... (Salva)"
+                        else:
+                            config[key] = value
                 except Exception:
-                    continue # Ignora linhas malformadas
+                    continue
                     
     return config
 
 def update_env_file(updates: Dict[str, str]) -> bool:
     """
     Atualiza com segurança o arquivo .env, preservando linhas e comentários.
-    'updates' é um dicionário como {'GNEWS_API_KEY': 'nova_chave', 'TTS_ENGINE': 'pt'}
+    'updates' é um dicionário com as novas configurações.
     """
     if not os.path.exists(ENV_FILE_PATH):
         logger.error(f"Arquivo .env não encontrado em {ENV_FILE_PATH}. Não é possível salvar.")
@@ -59,29 +63,28 @@ def update_env_file(updates: Dict[str, str]) -> bool:
 
         with open(ENV_FILE_PATH, 'w') as f:
             for line in lines:
-                # Preserva comentários e linhas em branco
                 if line.strip().startswith('#') or not line.strip():
                     f.write(line)
                     continue
                 
-                # Tenta encontrar a chave
                 try:
                     key, old_value = line.split('=', 1)
                     key = key.strip()
                     
-                    # Se esta é uma chave que queremos atualizar...
                     if key in updates:
                         new_value = updates[key]
-                        f.write(f"{key}='{new_value}'\n") # Escreve o novo valor com aspas
-                        keys_updated.add(key)
+                        if new_value is not None:
+                            f.write(f"{key}='{new_value}'\n")
+                            keys_updated.add(key)
+                        else:
+                            f.write(line)
                     else:
-                        f.write(line) # Escreve a linha antiga inalterada
+                        f.write(line)
                 except ValueError:
-                    f.write(line) # Escreve linha malformada (sem '=') como está
+                    f.write(line)
 
-            # Adiciona chaves que estavam no 'updates' mas não no arquivo
             for key, value in updates.items():
-                if key not in keys_updated:
+                if key not in keys_updated and value is not None:
                     f.write(f"{key}='{value}'\n")
 
         logger.info(f"Arquivo .env atualizado com as chaves: {list(updates.keys())}")

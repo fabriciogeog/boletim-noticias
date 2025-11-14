@@ -11,13 +11,19 @@ services:
       - ./backend/app:/app
       - ./data:/app/data
       - ./audio:/app/audio
+      # ================================================================
+      # CORREÇÃO: Monta o .env local dentro do container
+      # ================================================================
+      - ./.env:/app/.env
     
+    # Injeta as variáveis do arquivo .env
     environment:
-      - OLLAMA_HOST=http://ollama:11434 
       - PYTHONUNBUFFERED=1
       - GNEWS_API_KEY=${GNEWS_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - AI_SUMMARY_MODE=${AI_SUMMARY_MODE}
       - TTS_ENGINE=${TTS_ENGINE}
-      - ENABLE_OLLAMA=${ENABLE_OLLAMA}
       
     networks:
       - boletim-network
