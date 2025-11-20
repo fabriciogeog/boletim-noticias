@@ -16,6 +16,8 @@ WORKDIR /app
 # Copiar requirements
 COPY requirements.txt .
 
+# Atualizar o PIP (para garantir que temos a versão mais recente do instalador)
+RUN pip install --upgrade pip
 # Instalar dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -28,7 +30,7 @@ RUN mkdir -p /app/data /app/audio /app/temp
 # Expor porta
 EXPOSE 8000
 
-# Health check
+# Health check (CORRIGIDO: '|| exit 1' na mesma linha)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 

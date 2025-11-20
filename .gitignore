@@ -17,3 +17,30 @@ node_modules/
 # Sistema
 .DS_Store
 Thumbs.db
+.env
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyc
+
+# Ambiente
+.env
+*.db
+*.db-journal
+
+# Arquivos temporários
+*.backup
+*.old
+*.broken
+*.tmp
+container_inspect.txt
+testa_vozes_disponiveis.py
+
+# Áudios gerados
+audio/*.mp3
+audio/*.txt
+
+# Frontend antigo
+frontend_OLD_*/
+
+.env

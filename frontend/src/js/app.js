@@ -1,624 +1,432 @@
 // ========================================
-// Configuração e Constantes
+// CONFIGURAÇÕES E ESTADO
 // ========================================
-const API_BASE_URL = 'http://localhost:8000';  // API direta, não via proxy
+const API_BASE_URL = 'http://localhost:8000';
 
-// Estado da aplicação
 const appState = {
+    selectedCategories: ['geral'],
     currentBoletim: null,
-    audioUrl: null,
-    isGenerating: false
+    audioPlayer: null,
+    isPlaying: false,
+    config: {
+        ai_summary_mode: 'groq',
+        tts_engine: 'gtts',
+        style: 'jornalistico'
+    }
 };
 
 // ========================================
-// Inicialização
+// ELEMENTOS DO DOM
 // ========================================
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('Sistema de Boletim de Notícias inicializado');
-    
-    initializeEventListeners();
-    initializeKeyboardShortcuts();
-    checkApiHealth();
-});
-
-// ========================================
-// Event Listeners
-// ========================================
-function initializeEventListeners() {
-    // Formulário de geração
-    const form = document.getElementById('boletim-form');
-    form.addEventListener('submit', handleFormSubmit);
-    
-    // Botão limpar
-    const btnLimpar = document.getElementById('btn-limpar');
-    btnLimpar.addEventListener('click', handleLimparForm);
-    
-    // Botão editar texto
-    const btnEditarTexto = document.getElementById('btn-editar-texto');
-    btnEditarTexto.addEventListener('click', handleEditarTexto);
-    
-    // Botão regenerar áudio
-    const btnRegenerar = document.getElementById('btn-regenerar-audio');
-    btnRegenerar.addEventListener('click', handleRegenerarAudio);
-    
-    // Botão download
-    const btnDownload = document.getElementById('btn-download');
-    btnDownload.addEventListener('click', handleDownloadAudio);
-    
-    // Configurações
-    const btnRefreshModels = document.getElementById('btn-refresh-models');
-    btnRefreshModels.addEventListener('click', loadOllamaModels);
-    
-    const btnSaveModel = document.getElementById('btn-save-model');
-    btnSaveModel.addEventListener('click', handleSaveModel);
-    
-    // Botão de teste de áudio (debug)
-    const btnTestAudio = document.getElementById('btn-test-audio');
-    if (btnTestAudio) {
-        btnTestAudio.addEventListener('click', testAudioPlayer);
-        btnTestAudio.style.display = 'inline-flex'; // Mostrar para debug
-    }
-    
+const elements = {
     // Navegação
-    const navLinks = document.querySelectorAll('nav a');
-    navLinks.forEach(link => {
-        link.addEventListener('click', handleNavigation);
-    });
+    configBtn: document.getElementById('configBtn'),
+    sidebar: document.getElementById('sidebar'),
+    closeSidebar: document.getElementById('closeSidebar'),
+    overlay: document.getElementById('overlay'),
+    
+    // News Area
+    newsArea: document.getElementById('newsArea'),
+    placeholder: document.getElementById('placeholder'),
+    newsText: document.getElementById('newsText'),
+    
+    // Player
+    playerSection: document.getElementById('playerSection'),
+    audioPlayer: document.getElementById('audioPlayer'),
+    playBtn: document.getElementById('playBtn'),
+    progressFill: document.getElementById('progressFill'),
+    currentTime: document.getElementById('currentTime'),
+    duration: document.getElementById('duration'),
+    volumeBtn: document.getElementById('volumeBtn'),
+    downloadBtn: document.getElementById('downloadBtn'),
+    
+    // Categories
+    categoryBtns: document.querySelectorAll('.category-btn'),
+    
+    // Generate
+    generateBtn: document.getElementById('generateBtn'),
+    loadingOverlay: document.getElementById('loadingOverlay'),
+    
+    // Ticker
+    tickerContent: document.getElementById('tickerContent'),
+    
+    // Config Inputs (para controle de foco)
+    summaryMode: document.getElementById('summaryMode'),
+    groqKey: document.getElementById('groqKey'),
+    ttsEngine: document.getElementById('ttsEngine'),
+    elevenLabsKey: document.getElementById('elevenLabsKey'),
+    gnewsKey: document.getElementById('gnewsKey'),
+    boletimStyle: document.getElementById('boletimStyle'),
+    saveConfigBtn: document.getElementById('saveConfigBtn')
+};
+
+// ========================================
+// INICIALIZAÇÃO
+// ========================================
+async function init() {
+    console.log('🎙️ Sistema ON AIR inicializando...');
+    
+    setupEventListeners();
+    setupKeyboardShortcuts(); // NOVO: Atalhos de teclado
+    await loadConfig();
+    startTicker();
+    
+    console.log('✅ Sistema ON AIR pronto!');
 }
 
 // ========================================
-// Atalhos de Teclado
+// EVENT LISTENERS E ATALHOS
 // ========================================
-function initializeKeyboardShortcuts() {
+function setupEventListeners() {
+    // Sidebar
+    elements.configBtn.addEventListener('click', openSidebar);
+    elements.closeSidebar.addEventListener('click', closeSidebar);
+    elements.overlay.addEventListener('click', closeSidebar);
+    
+    // Categories
+    elements.categoryBtns.forEach(btn => {
+        btn.addEventListener('click', toggleCategory);
+    });
+    
+    // Generate
+    elements.generateBtn.addEventListener('click', generateBoletim);
+    
+    // Player Mouse Events
+    elements.playBtn.addEventListener('click', togglePlay);
+    elements.downloadBtn.addEventListener('click', downloadAudio);
+    elements.volumeBtn.addEventListener('click', toggleMute);
+    
+    // Audio events nativos
+    elements.audioPlayer.addEventListener('loadedmetadata', updateDuration);
+    elements.audioPlayer.addEventListener('timeupdate', updateProgress);
+    elements.audioPlayer.addEventListener('ended', onAudioEnded);
+    
+    // Barra de progresso (clique)
+    document.querySelector('.progress-bar').addEventListener('click', seekAudioMouse);
+    
+    // Config
+    elements.saveConfigBtn.addEventListener('click', saveConfig);
+}
+
+// NOVO: Controle total por teclado (Essencial para acessibilidade)
+function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-        // Ctrl + Enter: Gerar boletim
-        if (e.ctrlKey && e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('btn-gerar').click();
+        // Se estiver digitando em um input, não ativa atalhos de mídia
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+            if (e.key === 'Escape') closeSidebar(); // ESC fecha sidebar mesmo no input
+            return;
         }
-        
-        // Ctrl + E: Editar texto
-        if (e.ctrlKey && e.key === 'e') {
-            e.preventDefault();
-            const btnEditar = document.getElementById('btn-editar-texto');
-            if (!btnEditar.hidden) {
-                btnEditar.click();
-            }
-        }
-        
-        // Ctrl + D: Download
-        if (e.ctrlKey && e.key === 'd') {
-            e.preventDefault();
-            const btnDownload = document.getElementById('btn-download');
-            if (!btnDownload.hidden) {
-                btnDownload.click();
-            }
-        }
-        
-        // Alt + 1-4: Navegação
-        if (e.altKey && ['1', '2', '3', '4'].includes(e.key)) {
-            e.preventDefault();
-            const sections = ['gerar', 'historico', 'configuracoes', 'ajuda'];
-            const index = parseInt(e.key) - 1;
-            navigateToSection(sections[index]);
+
+        switch (e.code) {
+            case 'Space':
+            case 'KeyK': // Padrão YouTube
+                e.preventDefault(); // Evita scroll da página
+                if (!elements.playerSection.hidden) togglePlay();
+                break;
+            
+            case 'ArrowLeft': // Voltar 5s
+            case 'KeyJ':
+                if (!elements.playerSection.hidden) skipAudio(-5);
+                break;
+                
+            case 'ArrowRight': // Avançar 5s
+            case 'KeyL':
+                if (!elements.playerSection.hidden) skipAudio(5);
+                break;
+                
+            case 'Escape':
+                closeSidebar();
+                break;
         }
     });
 }
 
 // ========================================
-// Navegação
+// SIDEBAR (Com gestão de Foco)
 // ========================================
-function handleNavigation(e) {
-    e.preventDefault();
-    const href = e.target.getAttribute('href');
-    const sectionId = href.substring(1); // Remove '#'
-    navigateToSection(sectionId);
+function openSidebar() {
+    elements.sidebar.classList.add('active');
+    elements.overlay.removeAttribute('hidden');
+    elements.configBtn.setAttribute('aria-expanded', 'true');
+    
+    // ACESSIBILIDADE: Mover foco para o primeiro campo
+    setTimeout(() => elements.summaryMode.focus(), 300);
 }
 
-function navigateToSection(sectionId) {
-    // Esconder todas as seções
-    document.querySelectorAll('.content-section').forEach(section => {
-        section.hidden = true;
-    });
+function closeSidebar() {
+    elements.sidebar.classList.remove('active');
+    elements.overlay.setAttribute('hidden', '');
+    elements.configBtn.setAttribute('aria-expanded', 'false');
     
-    // Mostrar seção selecionada
-    const targetSection = document.getElementById(sectionId);
-    if (targetSection) {
-        targetSection.hidden = false;
-        targetSection.focus();
-        
-        // Se for configurações, carregar modelos
-        if (sectionId === 'configuracoes') {
-            loadOllamaModels();
+    // ACESSIBILIDADE: Devolver foco ao botão de abrir
+    elements.configBtn.focus();
+}
+
+// ========================================
+// CATEGORIES
+// ========================================
+function toggleCategory(e) {
+    const btn = e.currentTarget;
+    const category = btn.dataset.category;
+    
+    btn.classList.toggle('active');
+    
+    // Atualiza aria-pressed para leitores de tela
+    const isActive = btn.classList.contains('active');
+    btn.setAttribute('aria-pressed', isActive);
+    
+    if (isActive) {
+        if (!appState.selectedCategories.includes(category)) {
+            appState.selectedCategories.push(category);
         }
+    } else {
+        appState.selectedCategories = appState.selectedCategories.filter(c => c !== category);
     }
     
-    // Atualizar navegação
-    document.querySelectorAll('nav a').forEach(link => {
-        link.removeAttribute('aria-current');
-    });
-    
-    const activeLink = document.querySelector(`nav a[href="#${sectionId}"]`);
-    if (activeLink) {
-        activeLink.setAttribute('aria-current', 'page');
+    // Garantir ao menos uma categoria
+    if (appState.selectedCategories.length === 0) {
+        btn.classList.add('active');
+        btn.setAttribute('aria-pressed', 'true');
+        appState.selectedCategories.push(category);
     }
 }
 
 // ========================================
-// Geração de Boletim
+// GERAR BOLETIM
 // ========================================
-async function handleFormSubmit(e) {
-    e.preventDefault();
+async function generateBoletim() {
+    console.log('🎤 Gerando boletim...');
     
-    if (appState.isGenerating) {
-        showStatus('Aguarde a geração em andamento...', 'info');
-        return;
-    }
-    
-    const formData = getFormData();
-    
-    if (!formData.categories || formData.categories.length === 0) {
-        showStatus('Selecione pelo menos uma categoria', 'error');
-        speakMessage('Erro: Selecione pelo menos uma categoria');
-        return;
-    }
-    
-    // Limpar resultado anterior
-    const resultadoDiv = document.getElementById('resultado');
-    const textoTextarea = document.getElementById('texto-gerado');
-    const audioPlayer = document.getElementById('audio-player');
-    
-    resultadoDiv.hidden = true;
-    textoTextarea.value = '';
-    audioPlayer.hidden = true;
-    
-    await generateBoletim(formData);
-}
-
-function getFormData() {
-    const categories = Array.from(
-        document.querySelectorAll('input[name="categories"]:checked')
-    ).map(cb => cb.value);
-    
-    const numArticles = parseInt(
-        document.getElementById('num-articles').value
-    );
-    
-    const style = document.querySelector(
-        'input[name="style"]:checked'
-    ).value;
-    
-    const includeIntro = document.getElementById('include-intro').checked;
-    const includeOutro = document.getElementById('include-outro').checked;
-    
-    return {
-        categories,
-        num_articles: numArticles,
-        style,
-        include_intro: includeIntro,
-        include_outro: includeOutro
-    };
-}
-
-async function generateBoletim(data) {
-    appState.isGenerating = true;
-    
-    showLoading('Coletando notícias...');
-    showStatus('Gerando boletim...', 'info');
-    speakMessage('Gerando boletim');
+    elements.loadingOverlay.removeAttribute('hidden');
+    elements.generateBtn.disabled = true;
+    elements.newsText.setAttribute('hidden', ''); // Esconde texto antigo
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/generate-boletim`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                topics: appState.selectedCategories,
+                style: appState.config.style,
+                include_intro: true,
+                include_outro: true
+            })
         });
         
-        if (!response.ok) {
-            throw new Error(`Erro ${response.status}: ${response.statusText}`);
-        }
+        if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
         
-        const result = await response.json();
-        
-        if (result.success) {
-            appState.currentBoletim = result;
-            displayBoletim(result);
-            showStatus('Boletim gerado com sucesso!', 'success');
-            speakMessage('Boletim gerado com sucesso');
-        } else {
-            throw new Error('Falha na geração do boletim');
-        }
+        const data = await response.json();
+        appState.currentBoletim = data;
+        displayBoletim(data);
         
     } catch (error) {
-        console.error('Erro ao gerar boletim:', error);
-        showStatus(`Erro: ${error.message}`, 'error');
-        speakMessage(`Erro ao gerar boletim: ${error.message}`);
+        console.error('❌ Erro:', error);
+        showError('Erro ao gerar boletim. Verifique as chaves de API.');
     } finally {
-        hideLoading();
-        appState.isGenerating = false;
-    }
-}
-
-function displayBoletim(result) {
-    const resultadoDiv = document.getElementById('resultado');
-    const textoTextarea = document.getElementById('texto-gerado');
-    const audioPlayer = document.getElementById('audio-player');
-    const audioElement = document.getElementById('audio-element');
-    
-    console.log('=== DISPLAY BOLETIM ===');
-    console.log('Resultado completo:', result);
-    
-    // Mostrar resultado
-    resultadoDiv.hidden = false;
-    
-    // Exibir texto
-    textoTextarea.value = result.summary;
-    textoTextarea.readOnly = true;
-    
-    // Detectar áudio de múltiplas formas
-    const audioFile = result.audio_filename || result.audio_file;
-    const audioUrl = result.audio_url || result.download_url;
-    
-    console.log('Campos detectados:', {
-        audio_filename: result.audio_filename,
-        audio_file: result.audio_file,
-        audio_url: result.audio_url,
-        download_url: result.download_url
-    });
-    
-    // Verificar se é MP3 (não é .txt)
-    const isMP3 = audioFile && audioFile.endsWith('.mp3');
-    
-    console.log('É MP3?', isMP3, '| Arquivo:', audioFile);
-    
-    if (isMP3) {
-        // Construir URL completa
-        let fullUrl;
-        if (audioUrl) {
-            fullUrl = audioUrl.startsWith('http') ? audioUrl : `${API_BASE_URL}${audioUrl}`;
-        } else {
-            fullUrl = `${API_BASE_URL}/api/download/${audioFile}`;
-        }
-        
-        // Adicionar timestamp anti-cache
-        fullUrl += `?t=${Date.now()}`;
-        
-        console.log('URL final do áudio:', fullUrl);
-        
-        // Resetar e configurar player
-        audioElement.pause();
-        audioElement.src = '';
-        audioElement.load();
-        
-        audioElement.src = fullUrl;
-        audioElement.load();
-        
-        // FORÇAR mostrar player
-        audioPlayer.hidden = false;
-        audioPlayer.style.display = 'block';
-        
-        // Salvar para download
-        appState.audioUrl = fullUrl.split('?')[0];
-        
-        console.log('✓ Player VISÍVEL e configurado');
-        console.log('Player hidden:', audioPlayer.hidden);
-        console.log('Player display:', audioPlayer.style.display);
-        
-        showStatus('Áudio MP3 disponível!', 'success');
-        speakMessage('Áudio gerado com sucesso');
-        
-    } else {
-        console.log('✗ Áudio não é MP3 ou não existe');
-        audioPlayer.hidden = true;
-        
-        if (audioFile && audioFile.endsWith('.txt')) {
-            showStatus('Boletim gerado (modo texto)', 'info');
-        } else {
-            showStatus('Áudio não gerado', 'warning');
-        }
-    }
-    
-    // Scroll
-    resultadoDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    
-    console.log('======================');
-}
-
-// ========================================
-// Edição de Texto
-// ========================================
-function handleEditarTexto() {
-    const textarea = document.getElementById('texto-gerado');
-    const btnEditar = document.getElementById('btn-editar-texto');
-    
-    if (textarea.readOnly) {
-        textarea.readOnly = false;
-        textarea.focus();
-        btnEditar.textContent = 'Salvar Edição';
-        showStatus('Modo de edição ativado', 'info');
-        speakMessage('Modo de edição ativado');
-    } else {
-        textarea.readOnly = true;
-        btnEditar.textContent = 'Editar Texto (Ctrl+E)';
-        showStatus('Edições salvas', 'success');
-        speakMessage('Edições salvas');
-        
-        // Atualizar o texto no estado
-        if (appState.currentBoletim) {
-            appState.currentBoletim.summary = textarea.value;
-        }
-    }
-}
-
-async function handleRegenerarAudio() {
-    if (!appState.currentBoletim) {
-        return;
-    }
-    
-    showLoading('Gerando novo áudio...');
-    showStatus('Regenerando áudio...', 'info');
-    speakMessage('Regenerando áudio');
-    
-    try {
-        const textarea = document.getElementById('texto-gerado');
-        const text = textarea.value;
-        
-        // Chamar API de TTS
-        const response = await fetch(`${API_BASE_URL}/generate-audio`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ text })
-        });
-        
-        if (!response.ok) {
-            throw new Error('Falha ao gerar áudio');
-        }
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            const audioElement = document.getElementById('audio-element');
-            audioElement.src = result.download_url;
-            appState.audioUrl = result.download_url;
-            
-            showStatus('Áudio regenerado!', 'success');
-            speakMessage('Áudio regenerado com sucesso');
-        }
-        
-    } catch (error) {
-        console.error('Erro ao regenerar áudio:', error);
-        showStatus(`Erro: ${error.message}`, 'error');
-        speakMessage(`Erro ao regenerar áudio: ${error.message}`);
-    } finally {
-        hideLoading();
+        elements.loadingOverlay.setAttribute('hidden', '');
+        elements.generateBtn.disabled = false;
     }
 }
 
 // ========================================
-// Download
+// EXIBIR BOLETIM
 // ========================================
-function handleDownloadAudio() {
-    if (!appState.audioUrl) {
-        showStatus('Nenhum áudio disponível', 'error');
-        return;
-    }
+function displayBoletim(data) {
+    elements.placeholder.setAttribute('hidden', '');
+    elements.newsText.textContent = data.summary_text;
+    elements.newsText.removeAttribute('hidden');
     
-    const link = document.createElement('a');
-    link.href = appState.audioUrl;
-    link.download = `boletim_${Date.now()}.mp3`;
-    link.click();
-    
-    showStatus('Download iniciado', 'success');
-    speakMessage('Download iniciado');
-}
-
-// ========================================
-// Utilidades UI
-// ========================================
-function handleLimparForm() {
-    const form = document.getElementById('boletim-form');
-    form.reset();
-    
-    // Resetar para valores padrão
-    document.getElementById('cat-geral').checked = true;
-    document.getElementById('style-jornalistico').checked = true;
-    document.getElementById('include-intro').checked = true;
-    document.getElementById('include-outro').checked = true;
-    
-    showStatus('Formulário limpo', 'info');
-    speakMessage('Formulário limpo');
-}
-
-function showLoading(message) {
-    const loading = document.getElementById('loading');
-    const loadingMessage = document.getElementById('loading-message');
-    
-    loadingMessage.textContent = message;
-    loading.hidden = false;
-}
-
-function hideLoading() {
-    const loading = document.getElementById('loading');
-    loading.hidden = true;
-}
-
-function showStatus(message, type = 'info') {
-    const statusBar = document.getElementById('status-bar');
-    const statusMessage = document.getElementById('status-message');
-    
-    statusMessage.textContent = message;
-    statusBar.className = `status-bar ${type}`;
-    
-    // Auto-hide após 5 segundos (exceto errors)
-    if (type !== 'error') {
+    // TRUQUE: Timestamp para evitar cache do navegador (browser caching)
+    // Se o backend sempre retorna "boletim.mp3", o navegador não atualiza sem isso.
+    if (data.audio_filename && data.audio_filename.endsWith('.mp3')) {
+        const timestamp = new Date().getTime();
+        const audioUrl = `${API_BASE_URL}/audio/${data.audio_filename}?t=${timestamp}`;
+        
+        elements.audioPlayer.src = audioUrl;
+        elements.audioPlayer.load(); // Força recarregamento dos metadados
+        elements.playerSection.removeAttribute('hidden');
+        
+        // ACESSIBILIDADE: Mover foco para o botão PLAY
+        // Isso avisa ao deficiente visual que o áudio está pronto
         setTimeout(() => {
-            statusMessage.textContent = 'Sistema pronto';
-            statusBar.className = 'status-bar';
-        }, 5000);
+            elements.playBtn.focus();
+            showSuccessToast("Boletim pronto para tocar!");
+        }, 500);
+        
+    } else {
+        elements.playerSection.setAttribute('hidden', '');
+        // Se não tem áudio, foca no texto
+        elements.newsText.tabIndex = 0;
+        elements.newsText.focus();
     }
 }
 
 // ========================================
-// Health Check
+// LÓGICA DO PLAYER
 // ========================================
-async function checkApiHealth() {
+function togglePlay() {
+    if (elements.audioPlayer.paused) {
+        elements.audioPlayer.play();
+        updatePlayButton(true);
+    } else {
+        elements.audioPlayer.pause();
+        updatePlayButton(false);
+    }
+}
+
+function updatePlayButton(isPlaying) {
+    appState.isPlaying = isPlaying;
+    elements.playBtn.textContent = isPlaying ? '⏸️' : '▶️';
+    elements.playBtn.setAttribute('aria-label', isPlaying ? 'Pausar' : 'Tocar');
+}
+
+// Função auxiliar para pular tempo (setas do teclado)
+function skipAudio(seconds) {
+    const newTime = elements.audioPlayer.currentTime + seconds;
+    elements.audioPlayer.currentTime = Math.max(0, Math.min(newTime, elements.audioPlayer.duration));
+}
+
+// Seek via mouse
+function seekAudioMouse(e) {
+    const progressBar = e.currentTarget;
+    const rect = progressBar.getBoundingClientRect();
+    const percent = (e.clientX - rect.left) / rect.width;
+    elements.audioPlayer.currentTime = percent * elements.audioPlayer.duration;
+}
+
+function updateDuration() {
+    const duration = elements.audioPlayer.duration;
+    elements.duration.textContent = formatTime(duration);
+}
+
+function updateProgress() {
+    const current = elements.audioPlayer.currentTime;
+    const duration = elements.audioPlayer.duration || 1; // Evita divisão por zero
+    const percent = (current / duration) * 100;
+    
+    elements.progressFill.style.width = `${percent}%`;
+    elements.currentTime.textContent = formatTime(current);
+}
+
+function onAudioEnded() {
+    updatePlayButton(false);
+    elements.progressFill.style.width = '0%';
+}
+
+function toggleMute() {
+    elements.audioPlayer.muted = !elements.audioPlayer.muted;
+    const isMuted = elements.audioPlayer.muted;
+    elements.volumeBtn.textContent = isMuted ? '🔇' : '🔊';
+    elements.volumeBtn.setAttribute('aria-label', isMuted ? 'Ativar som' : 'Mudo');
+}
+
+function downloadAudio() {
+    if (!appState.currentBoletim?.audio_filename) return;
+    
+    const audioUrl = elements.audioPlayer.src; // Pega a URL já com timestamp
+    const a = document.createElement('a');
+    a.href = audioUrl;
+    a.download = `boletim_${new Date().toISOString().slice(0,10)}.mp3`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+function formatTime(seconds) {
+    if (isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// ========================================
+// CONFIGURAÇÕES E API
+// ========================================
+async function loadConfig() {
     try {
-        const response = await fetch(`${API_BASE_URL}/health`);
-        if (response.ok) {
-            console.log('✓ API conectada');
-            showStatus('Sistema pronto', 'success');
-        } else {
-            throw new Error('API não respondeu');
-        }
+        const response = await fetch(`${API_BASE_URL}/api/config`);
+        if (!response.ok) throw new Error('Falha no carregamento');
+        
+        const config = await response.json();
+        
+        // Atualiza inputs
+        if (elements.summaryMode) elements.summaryMode.value = config.AI_SUMMARY_MODE || 'groq';
+        if (elements.ttsEngine) elements.ttsEngine.value = config.TTS_ENGINE || 'gtts';
+        
+        // Placeholders de segurança
+        if (config.GROQ_API_KEY) elements.groqKey.placeholder = '•••• (Chave Salva)';
+        if (config.ELEVENLABS_API_KEY) elements.elevenLabsKey.placeholder = '•••• (Chave Salva)';
+        if (config.GNEWS_API_KEY) elements.gnewsKey.placeholder = '•••• (Chave Salva)';
+        
+        // Atualiza estado local
+        appState.config = {
+            ai_summary_mode: config.AI_SUMMARY_MODE,
+            tts_engine: config.TTS_ENGINE,
+            style: 'jornalistico'
+        };
+        
     } catch (error) {
-        console.error('✗ Erro ao conectar com API:', error);
-        showStatus('Atenção: API offline', 'error');
+        console.warn('⚠️ Config não carregada (Backend offline?):', error);
     }
 }
 
-// ========================================
-// Feedback Sonoro (será implementado em accessibility.js)
-// ========================================
-function speakMessage(message) {
-    // Implementado em accessibility.js
-    if (window.accessibility && window.accessibility.speak) {
-        window.accessibility.speak(message);
-    }
-}
-
-// ========================================
-// Configurações - Modelos Ollama
-// ========================================
-async function testAudioPlayer() {
-    try {
-        // Buscar último áudio gerado
-        const response = await fetch(`${API_BASE_URL}/api/list-audio`);
-        if (!response.ok) {
-            // Se endpoint não existir, tentar áudio de teste
-            showAudioDebug();
-            return;
-        }
-        
-        const data = await response.json();
-        if (data.files && data.files.length > 0) {
-            const lastAudio = data.files[0];
-            const audioUrl = `${API_BASE_URL}/api/download/${lastAudio}?t=${Date.now()}`;
-            
-            const audioElement = document.getElementById('audio-element');
-            const audioPlayer = document.getElementById('audio-player');
-            
-            audioElement.src = audioUrl;
-            audioElement.load();
-            audioPlayer.hidden = false;
-            
-            showStatus(`Testando: ${lastAudio}`, 'info');
-            console.log('Áudio de teste carregado:', audioUrl);
-        } else {
-            showStatus('Nenhum áudio encontrado', 'info');
-        }
-    } catch (error) {
-        console.error('Erro ao testar áudio:', error);
-        showAudioDebug();
-    }
-}
-
-function showAudioDebug() {
-    const audioElement = document.getElementById('audio-element');
-    const audioPlayer = document.getElementById('audio-player');
+async function saveConfig() {
+    const originalText = elements.saveConfigBtn.textContent;
+    elements.saveConfigBtn.textContent = 'Salvando...';
     
-    console.log('=== DEBUG ÁUDIO ===');
-    console.log('Player hidden:', audioPlayer.hidden);
-    console.log('Audio src:', audioElement.src);
-    console.log('Audio readyState:', audioElement.readyState);
-    console.log('Audio networkState:', audioElement.networkState);
-    console.log('Audio error:', audioElement.error);
-    console.log('appState.audioUrl:', appState.audioUrl);
-    console.log('==================');
-    
-    // Forçar mostrar player para debug
-    audioPlayer.hidden = false;
-    
-    showStatus('Debug info no console (F12)', 'info');
-}
-
-async function loadOllamaModels() {
-    try {
-        showStatus('Carregando modelos disponíveis...', 'info');
-        
-        const response = await fetch(`${API_BASE_URL}/api/ollama/models`);
-        const data = await response.json();
-        
-        if (data.success && data.models.length > 0) {
-            const select = document.getElementById('model-select');
-            const modelInfo = document.getElementById('model-info');
-            const currentModelSpan = document.getElementById('current-model');
-            
-            // Limpar opções
-            select.innerHTML = '';
-            
-            // Adicionar modelos
-            data.models.forEach(model => {
-                const option = document.createElement('option');
-                option.value = model;
-                option.textContent = model;
-                if (model === data.current) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
-            
-            // Mostrar modelo atual
-            currentModelSpan.textContent = data.current;
-            modelInfo.hidden = false;
-            
-            showStatus(`${data.models.length} modelo(s) encontrado(s)`, 'success');
-            speakMessage(`${data.models.length} modelos carregados`);
-        } else {
-            showStatus('Nenhum modelo Ollama encontrado', 'error');
-            const select = document.getElementById('model-select');
-            select.innerHTML = '<option value="">Nenhum modelo disponível</option>';
-        }
-    } catch (error) {
-        console.error('Erro ao carregar modelos:', error);
-        showStatus('Erro ao carregar modelos', 'error');
-        speakMessage('Erro ao carregar modelos');
-    }
-}
-
-async function handleSaveModel() {
-    const select = document.getElementById('model-select');
-    const selectedModel = select.value;
-    
-    if (!selectedModel) {
-        showStatus('Selecione um modelo', 'error');
-        return;
-    }
+    const configData = {
+        ai_summary_mode: elements.summaryMode.value,
+        tts_engine: elements.ttsEngine.value,
+        // Só envia se o usuário digitou algo novo
+        groq_api_key: elements.groqKey.value || null,
+        elevenlabs_api_key: elements.elevenLabsKey.value || null,
+        gnews_api_key: elements.gnewsKey.value || null
+    };
     
     try {
-        showStatus('Salvando configuração...', 'info');
-        
-        const response = await fetch(`${API_BASE_URL}/api/ollama/set-model?model_name=${encodeURIComponent(selectedModel)}`, {
-            method: 'POST'
+        const response = await fetch(`${API_BASE_URL}/api/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(configData)
         });
         
-        const data = await response.json();
+        if (!response.ok) throw new Error('Erro ao salvar');
         
-        if (data.success) {
-            showStatus(`Modelo alterado para: ${selectedModel}`, 'success');
-            speakMessage(`Modelo alterado para ${selectedModel}`);
-            
-            // Atualizar display
-            document.getElementById('current-model').textContent = selectedModel;
-        } else {
-            throw new Error('Falha ao salvar configuração');
-        }
+        showSuccess('Configurações salvas!');
+        await loadConfig(); // Recarrega para confirmar
+        
     } catch (error) {
-        console.error('Erro ao salvar modelo:', error);
-        showStatus('Erro ao salvar configuração', 'error');
-        speakMessage('Erro ao salvar configuração');
+        showError('Falha ao salvar configurações.');
+    } finally {
+        elements.saveConfigBtn.textContent = originalText;
     }
 }
+
+// ========================================
+// UTILIDADES VISUAIS
+// ========================================
+function showError(message) {
+    alert('❌ ' + message); // Simples e acessível (lê o alerta automaticamente)
+}
+
+function showSuccess(message) {
+    // Pequeno feedback visual sem interromper
+    console.log('✅ ' + message);
+}
+
+// Toast improvisado para feedback de leitor de tela
+function showSuccessToast(msg) {
+    // Poderia ser expandido para uma div flutuante com aria-live
+    console.log(msg); 
+}
+
+// ========================================
+// TICKER
+// ========================================
+function startTicker() {
+    const date = new Date().toLocaleDateString('pt-BR');
+    elements.tickerContent.textContent = `🎙️ Sistema Operacional • ${date} • Aguardando geração do boletim...`;
+}
+
+// Iniciar
+document.addEventListener('DOMContentLoaded', init);

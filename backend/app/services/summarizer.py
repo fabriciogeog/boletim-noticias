@@ -1,161 +1,93 @@
-import ollama
 import logging
 from typing import List, Dict
 import os
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 class NewsSummarizer:
     """
-    Sumarizador de notícias usando Ollama (LLM local)
+    Sumarizador com Groq (ultra-rápido e gratuito)
+    Fallback para resumo simples se Groq não estiver disponível
     """
     
     def __init__(self):
-        self.ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        #self.model = "llama3:8b"  # Modelo padrão
-        self.model = "deepseek-v3.1:671b-cloud"
+        self.groq_api_key = os.getenv("GROQ_API_KEY")
+        self.default_summary_mode = os.getenv("AI_SUMMARY_MODE", "none").lower()
         
+        if self.groq_api_key and self.default_summary_mode == "groq":
+            try:
+                from groq import Groq
+                self.groq_client = Groq(api_key=self.groq_api_key)
+                logger.info("✓ Sumarizador Groq (Nuvem) inicializado.")
+            except ImportError:
+                logger.error("✗ Biblioteca 'groq' não encontrada. Instale com: pip install groq")
+                self.groq_client = None
+            except Exception as e:
+                logger.error(f"✗ Falha ao inicializar Groq (verifique a API Key): {e}")
+                self.groq_client = None
+        else:
+            self.groq_client = None
+            logger.warning("="*50)
+            logger.warning("Sumarização com IA (Groq) está DESABILITADA (sem chave ou modo 'none').")
+            logger.warning("Usando o modo de fallback (lista de notícias simples).")
+            logger.warning("="*50)
+
     async def summarize(
         self,
         articles: List[Dict],
         style: str = "jornalistico",
         include_intro: bool = True,
         include_outro: bool = True,
-        max_words_per_article: int = 50
+        summary_mode: str = None
     ) -> str:
         """
-        Sumariza lista de notícias em formato de boletim
-        
-        Args:
-            articles: Lista de dicionários com notícias
-            style: Estilo do boletim (jornalistico, conversacional)
-            include_intro: Incluir introdução
-            include_outro: Incluir encerramento
-            max_words_per_article: Máximo de palavras por notícia
-        
-        Returns:
-            Texto sumarizado do boletim
+        Gera o roteiro do boletim. Tenta usar IA (Groq) se disponível
+        e habilitado, senão, usa o fallback simples.
         """
         if not articles:
             return "Nenhuma notícia disponível no momento."
-        
-        logger.info(f"Sumarizando {len(articles)} artigos com estilo '{style}'")
-        
-        # Preparar contexto para o LLM
-        articles_text = self._format_articles(articles)
-        
-        # Criar prompt baseado no estilo
-        prompt = self._create_prompt(
-            articles_text=articles_text,
-            style=style,
-            include_intro=include_intro,
-            include_outro=include_outro,
-            num_articles=len(articles)
-        )
-        
-        try:
-            # Chamar Ollama
-            response = ollama.chat(
-                model=self.model,
-                messages=[
-                    {
-                        'role': 'system',
-                        'content': self._get_system_prompt(style)
-                    },
-                    {
-                        'role': 'user',
-                        'content': prompt
-                    }
-                ]
-            )
-            
-            summary = response['message']['content'].strip()
-            logger.info(f"Boletim gerado com sucesso ({len(summary)} caracteres)")
-            
-            return summary
-        
-        except Exception as e:
-            logger.error(f"Erro ao sumarizar com Ollama: {e}")
-            # Fallback: retornar formatação simples
+
+        mode = summary_mode or self.default_summary_mode
+
+        if mode == "groq" and self.groq_client:
+            logger.info(f"Sumarizando {len(articles)} artigos com Groq (Nuvem)...")
+            try:
+                prompt = self._create_groq_prompt(articles, style, include_intro, include_outro)
+                
+                # Chama a API do Groq (compatível com OpenAI)
+                response = self.groq_client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",  # Modelo rápido e gratuito
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "Você é um roteirista profissional de rádio. Crie roteiros fluidos, naturais e envolventes para áudio."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    temperature=0.7,
+                    max_tokens=2000
+                )
+                
+                roteiro = response.choices[0].message.content
+                
+                # Adiciona créditos das fontes
+                source_names = self._get_source_credits(articles)
+                credits = f"\n\nEste boletim teve informações de {source_names}."
+                
+                logger.info("✓ Sumarização com Groq concluída com sucesso!")
+                return roteiro + credits
+                
+            except Exception as e:
+                logger.error(f"✗ Erro ao sumarizar com Groq: {e}")
+                logger.warning("Revertendo para o modo de fallback (lista simples)...")
+                return self._create_simple_summary(articles, include_intro, include_outro)
+        else:
+            logger.info(f"Gerando resumo simples (fallback) para {len(articles)} artigos.")
             return self._create_simple_summary(articles, include_intro, include_outro)
-    
-    def _format_articles(self, articles: List[Dict]) -> str:
-        """
-        Formata artigos para contexto do LLM
-        """
-        formatted = []
-        
-        for i, article in enumerate(articles, 1):
-            title = article.get('title', 'Sem título')
-            summary = article.get('summary', '')
-            source = article.get('source', 'fonte desconhecida')
-            category = article.get('category', 'geral')
-            
-            formatted.append(f"""
-Notícia {i}:
-Título: {title}
-Resumo: {summary}
-Fonte: {source}
-Categoria: {category}
----""")
-        
-        return "\n".join(formatted)
-    
-    def _get_system_prompt(self, style: str) -> str:
-        """
-        Prompt de sistema baseado no estilo
-        """
-        base = """Você é um assistente especializado em criar boletins de notícias para rádio.
-Seu objetivo é transformar notícias em um texto fluido, natural e adequado para locução.
-"""
-        
-        if style == "jornalistico":
-            return base + """
-Características do seu texto:
-- Tom formal e profissional
-- Linguagem clara e objetiva
-- Transições suaves entre notícias
-- Sem expressões coloquiais
-- Foco nos fatos principais
-"""
-        else:  # conversacional
-            return base + """
-Características do seu texto:
-- Tom amigável e acessível
-- Linguagem natural e fluida
-- Pode usar expressões cotidianas
-- Mais próximo do ouvinte
-- Mantém profissionalismo sem ser formal demais
-"""
-    
-    def _create_prompt(
-        self,
-        articles_text: str,
-        style: str,
-        include_intro: bool,
-        include_outro: bool,
-        num_articles: int
-    ) -> str:
-        """
-        Cria prompt para o LLM
-        """
-        prompt = f"""Com base nas {num_articles} notícias abaixo, crie um boletim de notícias para rádio.
-
-{articles_text}
-
-Instruções:
-1. {"Comece com uma saudação e introdução adequada" if include_intro else "Comece direto com as notícias"}
-2. Apresente cada notícia de forma resumida mas informativa (2-3 frases por notícia)
-3. Use transições naturais entre as notícias
-4. Mantenha o texto fluido e adequado para locução
-5. {"Finalize com um encerramento apropriado" if include_outro else "Termine após a última notícia"}
-6. NÃO use marcadores, bullets ou numeração
-7. Escreva em parágrafos corridos
-8. Tom: {style}
-
-Gere APENAS o texto do boletim, sem comentários adicionais."""
-        
-        return prompt
     
     def _create_simple_summary(
         self,
@@ -163,11 +95,7 @@ Gere APENAS o texto do boletim, sem comentários adicionais."""
         include_intro: bool,
         include_outro: bool
     ) -> str:
-        """
-        Cria resumo simples sem LLM (fallback)
-        """
-        from datetime import datetime
-        
+        """ Cria resumo simples sem LLM (fallback) """
         lines = []
         
         if include_intro:
@@ -180,37 +108,68 @@ Gere APENAS o texto do boletim, sem comentários adicionais."""
             summary = article.get('summary', '')
             
             if summary:
+                summary = summary.replace('\n', ' ').replace('\r', ' ')
                 lines.append(f"{title}. {summary}\n")
             else:
                 lines.append(f"{title}.\n")
+        
+        source_names = self._get_source_credits(articles)
+        if source_names:
+            lines.append(f"\nEste boletim teve informações de {source_names}.")
         
         if include_outro:
             lines.append("\nEssas foram as principais notícias. Até a próxima!")
         
         return "\n".join(lines)
-    
-    async def test_ollama_connection(self) -> bool:
-        """
-        Testa conexão com Ollama
-        """
-        try:
-            response = ollama.list()
-            logger.info(f"✓ Ollama conectado. Modelos disponíveis: {[m['name'] for m in response['models']]}")
-            return True
-        except Exception as e:
-            logger.error(f"✗ Erro ao conectar com Ollama: {e}")
-            return False
-    
-    async def pull_model(self, model_name: str = None) -> bool:
-        """
-        Baixa modelo do Ollama se não estiver disponível
-        """
-        model = model_name or self.model
-        try:
-            logger.info(f"Baixando modelo {model}...")
-            ollama.pull(model)
-            logger.info(f"✓ Modelo {model} baixado com sucesso")
-            return True
-        except Exception as e:
-            logger.error(f"✗ Erro ao baixar modelo: {e}")
-            return False
+
+    def _get_source_credits(self, articles: List[Dict]) -> str:
+        """ Pega os nomes das fontes para os créditos. """
+        source_names = set()
+        for article in articles:
+            source = article.get('source')
+            if source and source != 'Fonte desconhecida':
+                source_names.add(source)
+        return ", ".join(source_names)
+
+    def _format_articles_for_prompt(self, articles: List[Dict]) -> str:
+        """ Formata artigos para o prompt do Groq. """
+        formatted = []
+        for i, article in enumerate(articles, 1):
+            formatted.append(
+                f"Notícia {i} (Categoria: {article.get('category')}, Fonte: {article.get('source')}):\n"
+                f"Título: {article.get('title')}\n"
+                f"Descrição: {article.get('summary')}\n---"
+            )
+        return "\n".join(formatted)
+
+    def _create_groq_prompt(
+        self,
+        articles: List[Dict],
+        style: str,
+        include_intro: bool,
+        include_outro: bool
+    ) -> str:
+        """ Cria o prompt otimizado para o Groq. """
+        
+        articles_text = self._format_articles_for_prompt(articles)
+        
+        prompt = f"""
+Você é um roteirista de rádio. Sua tarefa é transformar a lista de notícias abaixo em um roteiro de áudio coeso, fluido e profissional.
+
+REGRAS PRINCIPAIS:
+1.  **Tom:** {style} (Se for 'jornalistico', seja formal. Se 'conversacional', seja mais amigável, mas mantenha a credibilidade).
+2.  **Transições:** Crie transições suaves entre as notícias (ex: "Mudando para a política...", "No mundo dos esportes...").
+3.  **Não liste:** Não use marcadores (bullets) ou numeração. O texto deve ser um parágrafo único e fluido.
+4.  **Não cite fontes:** Não diga "Segundo o G1..." no meio do texto. Os créditos serão adicionados no final.
+5.  {'**Introdução:** Comece com uma saudação e introdução adequadas.' if include_intro else 'Comece direto com a primeira notícia.'}
+6.  {'**Encerramento:** Finalize com um encerramento apropriado.' if include_outro else 'Termine após a última notícia.'}
+7.  **Seja conciso:** Resuma cada notícia em 1-2 frases.
+
+Aqui estão as notícias:
+---
+{articles_text}
+---
+
+Por favor, gere APENAS o roteiro final.
+"""
+        return prompt
