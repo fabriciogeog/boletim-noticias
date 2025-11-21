@@ -1,55 +1,68 @@
 #!/bin/bash
 # -----------------------------------------------
-# Script de sincronização Git - por Fabricio
-# Automatiza: add, commit, pull e push com segurança
+# Script de sincronização Git - Blindado
 # -----------------------------------------------
 
-# Cores para mensagens
+# Cores
 VERDE="\033[1;32m"
 AMARELO="\033[1;33m"
 VERMELHO="\033[1;31m"
 AZUL="\033[1;34m"
 RESET="\033[0m"
 
-echo -e "${AZUL}🔍 Verificando repositório Git...${RESET}"
+echo -e "${AZUL}🔍 Verificando repositório e segurança...${RESET}"
 
-# Verifica se existe um repositório Git
+# 1. Verifica se é um repo Git
 if [ ! -d ".git" ]; then
-    echo -e "${VERMELHO}❌ Esta pasta não é um repositório Git.${RESET}"
+    echo -e "${VERMELHO}❌ Erro: Esta pasta não é um repositório Git.${RESET}"
     exit 1
 fi
 
-# Mostra status atual
+# 2. TRAVA DE SEGURANÇA (NOVO): Verifica se o .env está protegido
+if [ -f ".env" ]; then
+    # Pergunta ao Git: "Você está ignorando o arquivo .env?"
+    IGNORE_CHECK=$(git check-ignore .env)
+    
+    if [ -z "$IGNORE_CHECK" ]; then
+        echo -e "${VERMELHO}🚨 PERIGO: O arquivo .env NÃO está no .gitignore!${RESET}"
+        echo -e "${AMARELO}O script foi abortado para evitar vazamento de senhas.${RESET}"
+        echo "Adicione .env ao arquivo .gitignore antes de continuar."
+        exit 1
+    else
+        echo -e "${VERDE}🛡️  Segurança OK: Arquivo .env está protegido/ignorado.${RESET}"
+    fi
+fi
+
+# Mostra status
 echo -e "${AMARELO}"
 git status
 echo -e "${RESET}"
 
-# Adiciona tudo ao staging
+# Adiciona arquivos
 echo -e "${AZUL}📦 Adicionando arquivos modificados...${RESET}"
 git add .
 
-# Pede mensagem de commit
-echo -ne "${AMARELO}✏️  Digite a mensagem do commit (ou deixe em branco para usar padrão): ${RESET}"
+# Mensagem de commit
+echo -ne "${AMARELO}✏️  Mensagem do commit (Enter para padrão): ${RESET}"
 read MENSAGEM
 
-# Se o usuário não escrever nada, cria mensagem padrão com data/hora
 if [ -z "$MENSAGEM" ]; then
     MENSAGEM="Atualização automática em $(date '+%d/%m/%Y %H:%M:%S')"
 fi
 
-# Faz o commit
+# Commit
 git commit -m "$MENSAGEM"
 
-# Atualiza o branch local antes de enviar
-echo -e "${AZUL}⬇️  Atualizando branch local com o remoto...${RESET}"
+# Pull com Rebase (Traz mudanças da nuvem sem criar commits de merge sujos)
+echo -e "${AZUL}⬇️  Sincronizando com o remoto (Pull)...${RESET}"
 git pull origin main --rebase
 
-# Envia as alterações
-echo -e "${AZUL}⬆️  Enviando alterações para o GitHub...${RESET}"
+# Push
+echo -e "${AZUL}⬆️  Enviando para o GitHub...${RESET}"
 git push origin main
 
 if [ $? -eq 0 ]; then
-    echo -e "${VERDE}✅ Sincronização concluída com sucesso!${RESET}"
+    echo -e "${VERDE}✅ Sucesso! Projeto atualizado.${RESET}"
 else
-    echo -e "${VERMELHO}⚠️  Ocorreu um erro durante o push. Verifique o log acima.${RESET}"
+    echo -e "${VERMELHO}⚠️  Erro no envio. Verifique se há conflitos ou bloqueios.${RESET}"
 fi

@@ -56,6 +56,7 @@ const elements = {
     ttsEngine: document.getElementById('ttsEngine'),
     elevenLabsKey: document.getElementById('elevenLabsKey'),
     gnewsKey: document.getElementById('gnewsKey'),
+    articlesPerCategory: document.getElementById('articlesPerCategory'),
     boletimStyle: document.getElementById('boletimStyle'),
     saveConfigBtn: document.getElementById('saveConfigBtn')
 };
@@ -199,8 +200,17 @@ async function generateBoletim() {
     
     elements.loadingOverlay.removeAttribute('hidden');
     elements.generateBtn.disabled = true;
-    elements.newsText.setAttribute('hidden', ''); // Esconde texto antigo
-    
+    elements.newsText.setAttribute('hidden', '');
+
+    // CÁLCULO INTELIGENTE:
+    // Pega o número do input (ex: 3)
+    const perCategory = parseInt(elements.articlesPerCategory.value) || 3;
+    // Conta quantas categorias estão ativas (ex: 4)
+    const numCategories = appState.selectedCategories.length;
+    // Define o total para enviar ao backend (ex: 12)
+    // Adicionamos +1 de margem de segurança para garantir arredondamentos
+    const totalLimit = (perCategory * numCategories);
+
     try {
         const response = await fetch(`${API_BASE_URL}/api/generate-boletim`, {
             method: 'POST',
@@ -208,6 +218,8 @@ async function generateBoletim() {
             body: JSON.stringify({
                 topics: appState.selectedCategories,
                 style: appState.config.style,
+                // AQUI ESTÁ O TRUQUE: Enviamos o total calculado
+                num_articles: totalLimit, 
                 include_intro: true,
                 include_outro: true
             })
