@@ -3,31 +3,39 @@ import os
 import httpx
 import asyncio
 from typing import List, Dict, Optional
+from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
 class NewsCollector:
     """
-    Coleta notícias usando a API oficial do GNews.io de forma ASSÍNCRONA (Paralela).
+    Coleta notícias usando a API GNews via endpoint de BUSCA (Search).
+    Isso garante relevância temática muito superior ao endpoint 'top-headlines'.
     """
     
     def __init__(self):
         self.api_key = os.getenv("GNEWS_API_KEY")
-        self.base_url = "https://gnews.io/api/v4/top-headlines"
+        # MUDANÇA CRÍTICA: Usando endpoint de busca para forçar relevância
+        self.base_url = "https://gnews.io/api/v4/search"
         
         if not self.api_key:
-            logger.error("="*50)
             logger.error("ERRO: GNEWS_API_KEY não definida.")
-            logger.error("="*50)
         
-        self.CATEGORY_MAP = {
-            "geral": "general", "politica": "nation", "futebol": "sports",
-            "esportes": "sports", "economia": "business", "cultura": "entertainment",
-            "tecnologia": "technology", "saude": "health", "ciencia": "science",
-            "mundo": "world"
+        # Mapeamento de 'Categoria' para 'Termos de Busca'
+        # Usamos operadores OR para ampliar a cobertura do tema
+        self.SEARCH_TERMS = {
+            "geral": "brasil", # Busca ampla
+            "politica": "política brasil OR governo federal OR congresso",
+            "economia": "economia brasil OR mercado financeiro OR inflação",
+            "tecnologia": "tecnologia inovação OR inteligência artificial",
+            "esportes": "esportes brasil OR futebol OR campeonato",
+            "entretenimento": "entretenimento OR cinema OR famosos OR música",
+            "futebol": "futebol brasil",
+            "saude": "saúde brasil OR medicina",
+            "ciencia": "ciência pesquisa",
+            "mundo": "notícias internacionais"
         }
         
-        # Cliente HTTP assíncrono
         self.client = httpx.AsyncClient()
 
     async def collect(
@@ -37,70 +45,74 @@ class NewsCollector:
         sources: Optional[List[str]] = None
     ) -> List[Dict]:
         """
-        Coleta notícias de múltiplas categorias EM PARALELO.
-        O 'limit' recebido aqui é o TOTAL de notícias (calculado pelo frontend).
+        Coleta notícias buscando ativamente por palavras-chave dos temas.
         """
-        if not self.api_key:
-            logger.warning("GNEWS_API_KEY ausente. Retornando lista vazia.")
+        if not self.api_key or not categories:
             return []
 
-        # Evita divisão por zero
-        if not categories:
-            return []
-
-        # Se o frontend pediu 12 notícias e tem 4 categorias, buscamos 3 de cada.
-        # Se a divisão não for exata, arredondamos para cima para não faltar.
+        # Calcula quantos artigos buscar por categoria
         articles_per_category = max(1, int(limit / len(categories)))
         
-        logger.info(f"Iniciando coleta: {len(categories)} categorias, alvo de ~{articles_per_category} notícias/cada.")
+        logger.info(f"🔎 Iniciando busca ativa (Search Strategy) para: {categories}")
 
-        # Cria uma lista de tarefas para rodar ao mesmo tempo
         tasks = []
         for category in categories:
-            tasks.append(self._fetch_category(category, articles_per_category))
+            clean_cat = category.lower().strip()
+            tasks.append(self._search_category(clean_cat, articles_per_category))
         
-        # DISPARA TODAS AS REQUISIÇÕES SIMULTANEAMENTE (Aqui está a velocidade!)
         results = await asyncio.gather(*tasks)
         
-        # Processa os resultados
         all_articles = []
         seen_titles = set()
         
         for category_articles in results:
             for article in category_articles:
-                # Remove duplicatas (mesma notícia em categorias diferentes)
                 if article['title'] not in seen_titles:
                     all_articles.append(article)
                     seen_titles.add(article['title'])
                     
-        logger.info(f"Total de artigos coletados e únicos: {len(all_articles)}")
-        
-        # Retorna o limite exato pedido pelo usuário
         return all_articles[:limit]
 
-    async def _fetch_category(self, category_name: str, max_articles: int) -> List[Dict]:
-        """ Função auxiliar para buscar uma única categoria """
-        api_topic = self.CATEGORY_MAP.get(category_name.lower(), "general")
+    async def _search_category(self, category_name: str, max_articles: int) -> List[Dict]:
+        """ Realiza a busca para uma categoria específica """
+        
+        # Pega os termos de busca ou usa o próprio nome da categoria como fallback
+        search_query = self.SEARCH_TERMS.get(category_name, category_name)
         
         params = {
             "apikey": self.api_key,
-            "country": "br",
+            "q": search_query,
             "lang": "pt",
-            "topic": api_topic,
-            "max": max_articles
+            "country": "br",
+            "max": max_articles,
+            "sortby": "publishedAt" # Garante notícias frescas
         }
         
         try:
+            # Log da URL para conferência (sem a API Key para segurança)
+            safe_url = f"{self.base_url}?q={quote(search_query)}&lang=pt..."
+            logger.info(f"Buscando GNews: {safe_url}")
+
             response = await self.client.get(
                 self.base_url, params=params, timeout=15.0
             )
             response.raise_for_status()
             data = response.json()
             articles = data.get("articles", [])
+            
+            # Validação extra: Se a busca retornar vazio e for um termo específico,
+            # tenta uma busca mais genérica para não vir vazio.
+            if not articles and category_name != 'geral':
+                logger.warning(f"Busca estrita para '{search_query}' vazia. Tentando termo simples.")
+                params['q'] = category_name # Tenta buscar só "economia" em vez da query complexa
+                retry = await self.client.get(self.base_url, params=params)
+                if retry.status_code == 200:
+                    articles = retry.json().get("articles", [])
+
             return self._parse_json_response(articles, category_name)
             
         except Exception as e:
-            logger.error(f"Erro ao coletar categoria '{category_name}': {e}")
+            logger.error(f"Erro na busca por '{category_name}': {e}")
             return []
 
     def _parse_json_response(self, articles: List[Dict], category: str) -> List[Dict]:

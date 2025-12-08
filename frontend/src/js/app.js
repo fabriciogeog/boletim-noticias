@@ -50,13 +50,13 @@ const elements = {
     // Ticker
     tickerContent: document.getElementById('tickerContent'),
     
-    // Config Inputs (para controle de foco)
+    // Config Inputs
     summaryMode: document.getElementById('summaryMode'),
     groqKey: document.getElementById('groqKey'),
     ttsEngine: document.getElementById('ttsEngine'),
     elevenLabsKey: document.getElementById('elevenLabsKey'),
     gnewsKey: document.getElementById('gnewsKey'),
-    articlesPerCategory: document.getElementById('articlesPerCategory'),
+    articlesPerCategory: document.getElementById('articlesPerCategory'), // Campo de Qtde
     boletimStyle: document.getElementById('boletimStyle'),
     saveConfigBtn: document.getElementById('saveConfigBtn')
 };
@@ -68,7 +68,7 @@ async function init() {
     console.log('🎙️ Sistema ON AIR inicializando...');
     
     setupEventListeners();
-    setupKeyboardShortcuts(); // NOVO: Atalhos de teclado
+    setupKeyboardShortcuts();
     await loadConfig();
     startTicker();
     
@@ -109,19 +109,19 @@ function setupEventListeners() {
     elements.saveConfigBtn.addEventListener('click', saveConfig);
 }
 
-// NOVO: Controle total por teclado (Essencial para acessibilidade)
+// Controle por teclado (Acessibilidade)
 function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-        // Se estiver digitando em um input, não ativa atalhos de mídia
+        // Se estiver digitando em um input, ignora atalhos de mídia
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
-            if (e.key === 'Escape') closeSidebar(); // ESC fecha sidebar mesmo no input
+            if (e.key === 'Escape') closeSidebar();
             return;
         }
 
         switch (e.code) {
             case 'Space':
             case 'KeyK': // Padrão YouTube
-                e.preventDefault(); // Evita scroll da página
+                e.preventDefault(); 
                 if (!elements.playerSection.hidden) togglePlay();
                 break;
             
@@ -143,14 +143,12 @@ function setupKeyboardShortcuts() {
 }
 
 // ========================================
-// SIDEBAR (Com gestão de Foco)
+// SIDEBAR (Gestão de Foco)
 // ========================================
 function openSidebar() {
     elements.sidebar.classList.add('active');
     elements.overlay.removeAttribute('hidden');
     elements.configBtn.setAttribute('aria-expanded', 'true');
-    
-    // ACESSIBILIDADE: Mover foco para o primeiro campo
     setTimeout(() => elements.summaryMode.focus(), 300);
 }
 
@@ -158,58 +156,77 @@ function closeSidebar() {
     elements.sidebar.classList.remove('active');
     elements.overlay.setAttribute('hidden', '');
     elements.configBtn.setAttribute('aria-expanded', 'false');
-    
-    // ACESSIBILIDADE: Devolver foco ao botão de abrir
     elements.configBtn.focus();
 }
 
 // ========================================
-// CATEGORIES
+// CATEGORIES (SMART MULTI-SELECT)
 // ========================================
 function toggleCategory(e) {
     const btn = e.currentTarget;
     const category = btn.dataset.category;
     
-    btn.classList.toggle('active');
-    
-    // Atualiza aria-pressed para leitores de tela
-    const isActive = btn.classList.contains('active');
-    btn.setAttribute('aria-pressed', isActive);
-    
-    if (isActive) {
+    // 1. Se já está ativo, tenta desmarcar
+    if (btn.classList.contains('active')) {
+        // Impede desmarcar o último para não ficar lista vazia
+        if (appState.selectedCategories.length > 1) {
+            btn.classList.remove('active');
+            btn.setAttribute('aria-pressed', 'false');
+            appState.selectedCategories = appState.selectedCategories.filter(c => c !== category);
+        } else {
+            console.warn("⚠️ Mínimo de 1 categoria necessária.");
+        }
+    } else {
+        // 2. Se está inativo, vai marcar
+        btn.classList.add('active');
+        btn.setAttribute('aria-pressed', 'true');
+        
+        // --- LÓGICA DE PROTEÇÃO DE RELEVÂNCIA ---
+        // Se o usuário clicou em algo ESPECÍFICO (não 'geral')
+        // e o 'geral' estava marcado, nós tiramos o 'geral' para evitar contaminação.
+        if (category !== 'geral' && appState.selectedCategories.includes('geral')) {
+            const geralBtn = document.querySelector('.category-btn[data-category="geral"]');
+            if (geralBtn) {
+                geralBtn.classList.remove('active');
+                geralBtn.setAttribute('aria-pressed', 'false');
+                appState.selectedCategories = appState.selectedCategories.filter(c => c !== 'geral');
+                console.log("🛡️ 'Geral' desmarcado automaticamente para priorizar tema específico.");
+            }
+        }
+        
+        // Adiciona a nova categoria na lista
         if (!appState.selectedCategories.includes(category)) {
             appState.selectedCategories.push(category);
         }
-    } else {
-        appState.selectedCategories = appState.selectedCategories.filter(c => c !== category);
     }
     
-    // Garantir ao menos uma categoria
-    if (appState.selectedCategories.length === 0) {
-        btn.classList.add('active');
-        btn.setAttribute('aria-pressed', 'true');
-        appState.selectedCategories.push(category);
-    }
+    console.log(`📂 Seleção Atual:`, appState.selectedCategories);
 }
 
 // ========================================
-// GERAR BOLETIM
+// GERAR BOLETIM (COM CÁLCULO DE COTA)
 // ========================================
 async function generateBoletim() {
-    console.log('🎤 Gerando boletim...');
+    console.log('🎤 Iniciando geração...');
     
     elements.loadingOverlay.removeAttribute('hidden');
     elements.generateBtn.disabled = true;
     elements.newsText.setAttribute('hidden', '');
 
     // CÁLCULO INTELIGENTE:
-    // Pega o número do input (ex: 3)
-    const perCategory = parseInt(elements.articlesPerCategory.value) || 3;
-    // Conta quantas categorias estão ativas (ex: 4)
+    // Pega o número do input (padrão 3 se vazio)
+    const perCategory = parseInt(elements.articlesPerCategory?.value) || 3;
+    // Conta quantas categorias estão ativas
     const numCategories = appState.selectedCategories.length;
-    // Define o total para enviar ao backend (ex: 12)
-    // Adicionamos +1 de margem de segurança para garantir arredondamentos
+    // Define o total para enviar ao backend
     const totalLimit = (perCategory * numCategories);
+
+    // DEBUG: Verifique isso no console se tiver dúvidas
+    console.log('🚀 ENVIANDO PARA O PYTHON:', {
+        topics: appState.selectedCategories,
+        per_category: perCategory,
+        total_requested: totalLimit
+    });
 
     try {
         const response = await fetch(`${API_BASE_URL}/api/generate-boletim`, {
@@ -218,8 +235,7 @@ async function generateBoletim() {
             body: JSON.stringify({
                 topics: appState.selectedCategories,
                 style: appState.config.style,
-                // AQUI ESTÁ O TRUQUE: Enviamos o total calculado
-                num_articles: totalLimit, 
+                num_articles: totalLimit, // Envia o total calculado
                 include_intro: true,
                 include_outro: true
             })
@@ -233,7 +249,7 @@ async function generateBoletim() {
         
     } catch (error) {
         console.error('❌ Erro:', error);
-        showError('Erro ao gerar boletim. Verifique as chaves de API.');
+        showError('Erro ao gerar boletim. Verifique logs/chaves.');
     } finally {
         elements.loadingOverlay.setAttribute('hidden', '');
         elements.generateBtn.disabled = false;
@@ -241,40 +257,39 @@ async function generateBoletim() {
 }
 
 // ========================================
-// EXIBIR BOLETIM
+// EXIBIR BOLETIM E PLAYER
 // ========================================
 function displayBoletim(data) {
     elements.placeholder.setAttribute('hidden', '');
     elements.newsText.textContent = data.summary_text;
     elements.newsText.removeAttribute('hidden');
     
-    // TRUQUE: Timestamp para evitar cache do navegador (browser caching)
-    // Se o backend sempre retorna "boletim.mp3", o navegador não atualiza sem isso.
+    // Tratamento de Cache de Áudio
     if (data.audio_filename && data.audio_filename.endsWith('.mp3')) {
         const timestamp = new Date().getTime();
         const audioUrl = `${API_BASE_URL}/audio/${data.audio_filename}?t=${timestamp}`;
         
         elements.audioPlayer.src = audioUrl;
-        elements.audioPlayer.load(); // Força recarregamento dos metadados
+        elements.audioPlayer.load();
         elements.playerSection.removeAttribute('hidden');
         
-        // ACESSIBILIDADE: Mover foco para o botão PLAY
-        // Isso avisa ao deficiente visual que o áudio está pronto
+        // Foco acessível
         setTimeout(() => {
             elements.playBtn.focus();
             showSuccessToast("Boletim pronto para tocar!");
         }, 500);
         
+        console.log('🔊 Áudio carregado:', audioUrl);
+        
     } else {
         elements.playerSection.setAttribute('hidden', '');
-        // Se não tem áudio, foca no texto
         elements.newsText.tabIndex = 0;
         elements.newsText.focus();
     }
 }
 
 // ========================================
-// LÓGICA DO PLAYER
+// CONTROLES DO PLAYER
 // ========================================
 function togglePlay() {
     if (elements.audioPlayer.paused) {
@@ -292,13 +307,11 @@ function updatePlayButton(isPlaying) {
     elements.playBtn.setAttribute('aria-label', isPlaying ? 'Pausar' : 'Tocar');
 }
 
-// Função auxiliar para pular tempo (setas do teclado)
 function skipAudio(seconds) {
     const newTime = elements.audioPlayer.currentTime + seconds;
     elements.audioPlayer.currentTime = Math.max(0, Math.min(newTime, elements.audioPlayer.duration));
 }
 
-// Seek via mouse
 function seekAudioMouse(e) {
     const progressBar = e.currentTarget;
     const rect = progressBar.getBoundingClientRect();
@@ -307,13 +320,12 @@ function seekAudioMouse(e) {
 }
 
 function updateDuration() {
-    const duration = elements.audioPlayer.duration;
-    elements.duration.textContent = formatTime(duration);
+    elements.duration.textContent = formatTime(elements.audioPlayer.duration);
 }
 
 function updateProgress() {
     const current = elements.audioPlayer.currentTime;
-    const duration = elements.audioPlayer.duration || 1; // Evita divisão por zero
+    const duration = elements.audioPlayer.duration || 1;
     const percent = (current / duration) * 100;
     
     elements.progressFill.style.width = `${percent}%`;
@@ -334,8 +346,7 @@ function toggleMute() {
 
 function downloadAudio() {
     if (!appState.currentBoletim?.audio_filename) return;
-    
-    const audioUrl = elements.audioPlayer.src; // Pega a URL já com timestamp
+    const audioUrl = elements.audioPlayer.src;
     const a = document.createElement('a');
     a.href = audioUrl;
     a.download = `boletim_${new Date().toISOString().slice(0,10)}.mp3`;
@@ -352,7 +363,7 @@ function formatTime(seconds) {
 }
 
 // ========================================
-// CONFIGURAÇÕES E API
+// API E CONFIGURAÇÃO
 // ========================================
 async function loadConfig() {
     try {
@@ -361,16 +372,13 @@ async function loadConfig() {
         
         const config = await response.json();
         
-        // Atualiza inputs
         if (elements.summaryMode) elements.summaryMode.value = config.AI_SUMMARY_MODE || 'groq';
         if (elements.ttsEngine) elements.ttsEngine.value = config.TTS_ENGINE || 'gtts';
         
-        // Placeholders de segurança
-        if (config.GROQ_API_KEY) elements.groqKey.placeholder = '•••• (Chave Salva)';
-        if (config.ELEVENLABS_API_KEY) elements.elevenLabsKey.placeholder = '•••• (Chave Salva)';
-        if (config.GNEWS_API_KEY) elements.gnewsKey.placeholder = '•••• (Chave Salva)';
+        if (config.GROQ_API_KEY) elements.groqKey.placeholder = '•••• (Salvo)';
+        if (config.ELEVENLABS_API_KEY) elements.elevenLabsKey.placeholder = '•••• (Salvo)';
+        if (config.GNEWS_API_KEY) elements.gnewsKey.placeholder = '•••• (Salvo)';
         
-        // Atualiza estado local
         appState.config = {
             ai_summary_mode: config.AI_SUMMARY_MODE,
             tts_engine: config.TTS_ENGINE,
@@ -389,7 +397,6 @@ async function saveConfig() {
     const configData = {
         ai_summary_mode: elements.summaryMode.value,
         tts_engine: elements.ttsEngine.value,
-        // Só envia se o usuário digitou algo novo
         groq_api_key: elements.groqKey.value || null,
         elevenlabs_api_key: elements.elevenLabsKey.value || null,
         gnews_api_key: elements.gnewsKey.value || null
@@ -405,7 +412,7 @@ async function saveConfig() {
         if (!response.ok) throw new Error('Erro ao salvar');
         
         showSuccess('Configurações salvas!');
-        await loadConfig(); // Recarrega para confirmar
+        await loadConfig(); 
         
     } catch (error) {
         showError('Falha ao salvar configurações.');
@@ -415,26 +422,20 @@ async function saveConfig() {
 }
 
 // ========================================
-// UTILIDADES VISUAIS
+// UTILITÁRIOS
 // ========================================
 function showError(message) {
-    alert('❌ ' + message); // Simples e acessível (lê o alerta automaticamente)
+    alert('❌ ' + message);
 }
 
 function showSuccess(message) {
-    // Pequeno feedback visual sem interromper
     console.log('✅ ' + message);
 }
 
-// Toast improvisado para feedback de leitor de tela
 function showSuccessToast(msg) {
-    // Poderia ser expandido para uma div flutuante com aria-live
     console.log(msg); 
 }
 
-// ========================================
-// TICKER
-// ========================================
 function startTicker() {
     const date = new Date().toLocaleDateString('pt-BR');
     elements.tickerContent.textContent = `🎙️ Sistema Operacional • ${date} • Aguardando geração do boletim...`;
