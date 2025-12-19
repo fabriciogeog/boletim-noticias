@@ -154,22 +154,22 @@ class NewsSummarizer:
         articles_text = self._format_articles_for_prompt(articles)
         
         prompt = f"""
-Você é um roteirista de rádio. Sua tarefa é transformar a lista de notícias abaixo em um roteiro de áudio coeso, fluido e profissional.
+Você é um âncora de rádio experiente. Sua tarefa é transformar a lista de notícias cruas abaixo em um roteiro de áudio fluido e natural.
 
-REGRAS PRINCIPAIS:
-1.  **Tom:** {style} (Se for 'jornalistico', seja formal. Se 'conversacional', seja mais amigável, mas mantenha a credibilidade).
-2.  **Transições:** Crie transições suaves entre as notícias (ex: "Mudando para a política...", "No mundo dos esportes...").
-3.  **Não liste:** Não use marcadores (bullets) ou numeração. O texto deve ser um parágrafo único e fluido.
-4.  **Não cite fontes:** Não diga "Segundo o G1..." no meio do texto. Os créditos serão adicionados no final.
-5.  {'**Introdução:** Comece com uma saudação e introdução adequadas.' if include_intro else 'Comece direto com a primeira notícia.'}
-6.  {'**Encerramento:** Finalize com um encerramento apropriado.' if include_outro else 'Termine após a última notícia.'}
-7.  **Seja conciso:** Resuma cada notícia em 1-2 frases.
+REGRAS DE OURO:
+1.  **Fidelidade ao Tema:** Se as notícias forem todas do mesmo assunto (ex: só Economia), NÃO invente transições como "Mudando de assunto" ou "No cenário internacional". Apenas conecte uma notícia à outra de forma lógica (ex: "Ainda sobre o mercado...", "Por outro lado...").
+2.  **Tom:** {style} (Adapte o vocabulário: Formal para jornalístico, leve para conversacional).
+3.  **Estrutura:** Texto corrido, sem tópicos. Use pontuação adequada para a respiração do locutor.
+4.  **Conteúdo:** Resuma cada notícia em 1 ou 2 frases curtas. Vá direto ao ponto.
+5.  **Proibido:** Não cite nomes de jornais (G1, Folha) no texto. Os créditos vão no final.
+6.  {'**Abertura:** Comece com uma saudação rápida.' if include_intro else 'Comece direto na primeira notícia.'}
+7.  {'**Fechamento:** Encerre convidando para a próxima edição.' if include_outro else 'Encerre após a última notícia.'}
 
-Aqui estão as notícias:
+Notícias para locução:
 ---
 {articles_text}
 ---
 
-Por favor, gere APENAS o roteiro final.
+Gere APENAS o texto final para ser lido.
 """
         return prompt

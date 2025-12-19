@@ -60,56 +60,66 @@ class TTSGenerator:
         self,
         text: str,
         tts_engine: str = "gtts",
-        # ================================================================
-        # CORREÇÃO 4: Usando o ID da Voz "Clyde" (como você sugeriu)
-        # ================================================================
         tts_voice_id: str = "21m00Tcm4TlvDq8ikWAM",
         tld: Optional[str] = "com.br"
     ) -> str:
         """
-        Gera áudio a partir do texto usando o motor selecionado.
+        Gera áudio com Fallback Automático: Tenta ElevenLabs -> Falha -> Usa gTTS.
         """
         if not text:
             raise ValueError("Texto vazio fornecido")
         
-        logger.info(f"Gerando áudio com motor '{tts_engine}': {len(text)} caracteres")
+        logger.info(f"Gerando áudio (Motor preferido: '{tts_engine}')...")
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"boletim_{timestamp}.mp3"
         output_path = self.output_dir / filename
         
+        cleaned_text = self._prepare_text(text)
+        temp_path = None
+        
         try:
-            cleaned_text = self._prepare_text(text)
-            
-            # --- Roteador do Motor TTS ---
+            # TENTATIVA 1: Motor Principal (Se for ElevenLabs)
             if tts_engine == "elevenlabs" and self.elevenlabs_client:
-                temp_path = await self._generate_elevenlabs(cleaned_text, output_path, tts_voice_id)
-            elif tts_engine == "gtts" and self.gTTS_client:
-                temp_path = await self._generate_gtts(cleaned_text, output_path, tld or "com.br")
-            else:
-                logger.warning(f"Motor '{tts_engine}' não disponível. Revertendo para gTTS.")
+                try:
+                    temp_path = await self._generate_elevenlabs(cleaned_text, output_path, tts_voice_id)
+                except Exception as e_eleven:
+                    logger.warning(f"⚠️ ElevenLabs falhou (Cota/Erro): {e_eleven}")
+                    logger.info("🔄 Ativando FALLBACK automático para Google TTS (gTTS)...")
+                    # Força a troca para gTTS se der erro no Premium
+                    if self.gTTS_client:
+                        temp_path = await self._generate_gtts(cleaned_text, output_path, tld or "com.br")
+                        tts_engine = "gtts" # Atualiza flag para aplicar aceleração depois
+                    else:
+                        raise e_eleven # Se nem o gTTS estiver disponível, desiste.
+
+            # TENTATIVA 2: Motor Google (Se já foi escolhido ou se caiu no fallback)
+            elif tts_engine == "gtts" or (tts_engine == "elevenlabs" and not self.elevenlabs_client):
                 if not self.gTTS_client:
-                    raise RuntimeError("Nenhum motor TTS disponível (gTTS falhou ao carregar)")
+                    raise RuntimeError("gTTS não disponível.")
                 temp_path = await self._generate_gtts(cleaned_text, output_path, tld or "com.br")
             
-            # --- Pós-processamento (Aceleração - apenas para gTTS) ---
-            if tts_engine == "gtts" and AudioSegment:
+            # --- Pós-processamento (Aceleração - Apenas para gTTS) ---
+            # Se usou gTTS (seja por escolha ou por fallback), aplicamos a aceleração
+            if tts_engine == "gtts" and AudioSegment and temp_path:
                 try:
-                    logger.info("Aplicando aceleração de 15% (1.15x) no áudio gTTS...")
+                    logger.info("⚡ Acelerando áudio gTTS em 15%...")
                     audio = AudioSegment.from_mp3(str(temp_path))
                     faster_audio = audio.speedup(playback_speed=1.15)
                     faster_audio.export(str(output_path), format="mp3", bitrate="192k")
-                    temp_path.unlink()
-                except Exception as e:
-                    logger.warning(f"Não foi possível acelerar áudio: {e}. Usando arquivo original.")
-                    temp_path.rename(output_path)
-            elif temp_path != output_path:
-                 temp_path.rename(output_path) # Se for ElevenLabs, só renomeia
-
+                    # Remove o arquivo temporário original
+                    if temp_path != output_path and temp_path.exists():
+                        temp_path.unlink()
+                except Exception as e_speed:
+                    logger.warning(f"Falha na aceleração: {e_speed}. Mantendo original.")
+                    if temp_path != output_path:
+                        temp_path.rename(output_path)
+            
             return str(output_path)
 
         except Exception as e:
-            logger.error(f"✗ Erro fatal ao gerar áudio: {e}")
+            logger.error(f"✗ Erro fatal em todos os motores: {e}")
+            # Último recurso: Salva texto para debug
             text_path = self.output_dir / f"boletim_{timestamp}.txt"
             with open(text_path, 'w', encoding='utf-8') as f:
                 f.write(text)

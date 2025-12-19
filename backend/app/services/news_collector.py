@@ -10,30 +10,40 @@ logger = logging.getLogger(__name__)
 class NewsCollector:
     """
     Coleta notícias usando a API GNews via endpoint de BUSCA (Search).
-    Isso garante relevância temática muito superior ao endpoint 'top-headlines'.
+    Estratégia Híbrida: Usa termos em PT e EN para maximizar a busca,
+    mas filtra resultados apenas em Português do Brasil.
     """
     
     def __init__(self):
         self.api_key = os.getenv("GNEWS_API_KEY")
-        # MUDANÇA CRÍTICA: Usando endpoint de busca para forçar relevância
         self.base_url = "https://gnews.io/api/v4/search"
         
         if not self.api_key:
             logger.error("ERRO: GNEWS_API_KEY não definida.")
         
-        # Mapeamento de 'Categoria' para 'Termos de Busca'
-        # Usamos operadores OR para ampliar a cobertura do tema
+        # Mapeamento HÍBRIDO (Português + Inglês)
+        # O teste do usuário provou que termos como 'sport' trazem resultados melhores
+        # devido a nomes de times e URLs, mesmo em notícias brasileiras.
         self.SEARCH_TERMS = {
-            "geral": "brasil", # Busca ampla
-            "politica": "política brasil OR governo federal OR congresso",
-            "economia": "economia brasil OR mercado financeiro OR inflação",
-            "tecnologia": "tecnologia inovação OR inteligência artificial",
-            "esportes": "esportes brasil OR futebol OR campeonato",
-            "entretenimento": "entretenimento OR cinema OR famosos OR música",
-            "futebol": "futebol brasil",
-            "saude": "saúde brasil OR medicina",
-            "ciencia": "ciência pesquisa",
-            "mundo": "notícias internacionais"
+            "geral": "brasil OR breaking news OR manchetes",
+            
+            "politica": "política brasil OR congresso nacional OR governo federal OR planalto OR politics brazil",
+            
+            "economia": "economia brasil OR mercado financeiro OR inflação OR business brazil OR economy",
+            
+            "tecnologia": "tecnologia inovação OR inteligência artificial OR startups OR tech brazil OR technology",
+            
+            # AQUI ESTÁ A MUDANÇA SOLICITADA:
+            # Adicionamos 'sport' e 'sports' para pegar tanto a categoria quanto nomes de times (Sport Recife, etc)
+            "esportes": "esportes brasil OR futebol OR campeonato OR sport brazil OR sports",
+            
+            "entretenimento": "cinema brasil OR música brasil OR cultura pop OR famosos OR entertainment",
+            
+            # Aliases
+            "futebol": "futebol brasil OR soccer brazil",
+            "saude": "saúde pública brasil OR medicina OR health brazil",
+            "ciencia": "ciência pesquisa brasil OR science brazil",
+            "mundo": "notícias internacionais mundo OR world news"
         }
         
         self.client = httpx.AsyncClient()
@@ -45,7 +55,7 @@ class NewsCollector:
         sources: Optional[List[str]] = None
     ) -> List[Dict]:
         """
-        Coleta notícias buscando ativamente por palavras-chave dos temas.
+        Coleta notícias buscando ativamente por palavras-chave.
         """
         if not self.api_key or not categories:
             return []
@@ -53,7 +63,7 @@ class NewsCollector:
         # Calcula quantos artigos buscar por categoria
         articles_per_category = max(1, int(limit / len(categories)))
         
-        logger.info(f"🔎 Iniciando busca ativa (Search Strategy) para: {categories}")
+        logger.info(f"🔎 Iniciando busca HÍBRIDA para: {categories}")
 
         tasks = []
         for category in categories:
@@ -74,24 +84,22 @@ class NewsCollector:
         return all_articles[:limit]
 
     async def _search_category(self, category_name: str, max_articles: int) -> List[Dict]:
-        """ Realiza a busca para uma categoria específica """
+        """ Realiza a busca específica """
         
-        # Pega os termos de busca ou usa o próprio nome da categoria como fallback
+        # Pega a query híbrida
         search_query = self.SEARCH_TERMS.get(category_name, category_name)
         
         params = {
             "apikey": self.api_key,
             "q": search_query,
-            "lang": "pt",
-            "country": "br",
+            "lang": "pt",       # Mantemos PT para garantir que o texto venha em português
+            "country": "br",    # Mantemos BR
             "max": max_articles,
-            "sortby": "publishedAt" # Garante notícias frescas
+            "sortby": "publishedAt"
         }
         
         try:
-            # Log da URL para conferência (sem a API Key para segurança)
-            safe_url = f"{self.base_url}?q={quote(search_query)}&lang=pt..."
-            logger.info(f"Buscando GNews: {safe_url}")
+            logger.info(f"Buscando GNews por: '{search_query}'")
 
             response = await self.client.get(
                 self.base_url, params=params, timeout=15.0
@@ -100,11 +108,10 @@ class NewsCollector:
             data = response.json()
             articles = data.get("articles", [])
             
-            # Validação extra: Se a busca retornar vazio e for um termo específico,
-            # tenta uma busca mais genérica para não vir vazio.
+            # Fallback
             if not articles and category_name != 'geral':
-                logger.warning(f"Busca estrita para '{search_query}' vazia. Tentando termo simples.")
-                params['q'] = category_name # Tenta buscar só "economia" em vez da query complexa
+                logger.warning(f"Busca estrita vazia. Tentando fallback simples: '{category_name}'")
+                params['q'] = category_name 
                 retry = await self.client.get(self.base_url, params=params)
                 if retry.status_code == 200:
                     articles = retry.json().get("articles", [])
