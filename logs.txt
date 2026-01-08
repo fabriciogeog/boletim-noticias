@@ -1,0 +1,50 @@
+docker compose logs api 
+boletim-api  | INFO:     Will watch for changes in these directories: ['/app']
+boletim-api  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+boletim-api  | INFO:     Started reloader process [1] using WatchFiles
+boletim-api  | Process SpawnProcess-1:
+boletim-api  | Traceback (most recent call last):
+boletim-api  |   File "/usr/local/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+boletim-api  |     self.run()
+boletim-api  |   File "/usr/local/lib/python3.11/multiprocessing/process.py", line 108, in run
+boletim-api  |     self._target(*self._args, **self._kwargs)
+boletim-api  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+boletim-api  |     target(sockets=sockets)
+boletim-api  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 67, in run
+boletim-api  |     return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+boletim-api  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+boletim-api  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+boletim-api  |     return runner.run(main)
+boletim-api  |            ^^^^^^^^^^^^^^^^
+boletim-api  |   File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+boletim-api  |     return self._loop.run_until_complete(task)
+boletim-api  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+boletim-api  |   File "/usr/local/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+boletim-api  |     return future.result()
+boletim-api  |            ^^^^^^^^^^^^^^^
+boletim-api  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 71, in serve
+boletim-api  |     await self._serve(sockets)
+boletim-api  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 78, in _serve
+boletim-api  |     config.load()
+boletim-api  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/config.py", line 439, in load
+boletim-api  |     self.loaded_app = import_from_string(self.app)
+boletim-api  |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+boletim-api  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 22, in import_from_string
+boletim-api  |     raise exc from None
+boletim-api  |   File "/usr/local/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+boletim-api  |     module = importlib.import_module(module_str)
+boletim-api  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+boletim-api  |   File "/usr/local/lib/python3.11/importlib/__init__.py", line 126, in import_module
+boletim-api  |     return _bootstrap._gcd_import(name[level:], package, level)
+boletim-api  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+boletim-api  |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+boletim-api  |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+boletim-api  |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+boletim-api  |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+boletim-api  |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+boletim-api  |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+boletim-api  |   File "/app/main.py", line 17, in <module>
+boletim-api  |     from database import db_session, init_db, Boletim as BoletimModel
+boletim-api  |   File "/app/database.py", line 2, in <module>
+boletim-api  |     from sqlalchemy import create_engine, Column, Integer, String, DateTime
+boletim-api  | ModuleNotFoundError: No module named 'sqlalchemy'

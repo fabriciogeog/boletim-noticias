@@ -1,0 +1,52 @@
+.
+├── GUIA_INSTALACAO_WINDOWS.md
+├── LINUX.md
+├── Makefile
+├── QUICK_START.md
+├── README.md
+├── atualizar_git.sh
+├── audio
+│   ├── boletim_20260107_202727.mp3
+│   ├── boletim_20260108_160125.mp3
+│   ├── boletim_20260108_160907.mp3
+│   ├── boletim_20260108_165950.mp3
+│   ├── boletim_20260108_170444.mp3
+│   ├── boletim_20260108_171230.mp3
+│   ├── boletim_20260108_215736.mp3
+│   └── boletim_20260108_220041.mp3
+├── backend
+│   ├── Dockerfile
+│   ├── app
+│   │   ├── __pycache__
+│   │   ├── audio
+│   │   ├── data
+│   │   ├── database.py
+│   │   ├── env_manager.py
+│   │   ├── main.py
+│   │   └── services
+│   └── requirements.txt
+├── boletim-noticias.md
+├── comandos.bat
+├── data
+│   └── boletim.db
+├── docker-compose.yml
+├── frontend
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   └── src
+│       ├── assets
+│       ├── css
+│       ├── index.html
+│       └── js
+├── install-windows.bat
+├── logs.txt
+├── palette.png
+├── palette1.png
+├── requisitos_locutor.md
+├── requisitos_locutor_respondido.md
+├── setup.sh
+├── testa_vozes_disponiveis.py
+├── tree.txt
+└── windows_guide.md
+
+14 directories, 36 files

@@ -1,3 +1,26 @@
+
+// ========================================
+// NOVOS ELEMENTOS
+// ========================================
+
+const newsEditor = document.getElementById('newsEditor');
+const editControls = document.getElementById('editControls');
+const btnEdit = document.getElementById('btnEdit');
+const saveCancelGroup = document.getElementById('saveCancelGroup');
+const btnSaveAudio = document.getElementById('btnSaveAudio');
+const btnCancelEdit = document.getElementById('btnCancelEdit');
+const readModeGroup = document.getElementById('readModeGroup');
+const btnCopy = document.getElementById('btnCopy');
+const btnSaveTextOnly = document.getElementById('btnSaveTextOnly');
+
+// Elementos de Interface já existentes (Só para conferência)
+const newsText = document.getElementById('newsText');
+const playerSection = document.getElementById('playerSection');
+const audioPlayer = document.getElementById('audioPlayer');
+const placeholder = document.getElementById('placeholder');
+const durationDisplay = document.getElementById('duration');
+const currentTimeDisplay = document.getElementById('currentTime');
+
 // ========================================
 // CONFIGURAÇÕES E ESTADO
 // ========================================
@@ -99,6 +122,11 @@ function setupEventListeners() {
     
     document.querySelector('.progress-bar').addEventListener('click', seekAudioMouse);
     elements.saveConfigBtn.addEventListener('click', saveConfig);
+    btnEdit.addEventListener('click', enterEditMode);
+    btnCancelEdit.addEventListener('click', exitEditMode);
+    btnSaveAudio.addEventListener('click', saveAndRegenerateAudio);
+    btnCopy.addEventListener('click', copyTextToClipboard);
+    btnSaveTextOnly.addEventListener('click', saveTextOnly);
 }
 
 function setupKeyboardShortcuts() {
@@ -230,27 +258,45 @@ async function generateBoletim() {
 }
 
 // ========================================
-// EXIBIR E TOCAR
+// EXIBIR E TOCAR (ATUALIZADA)
 // ========================================
 function displayBoletim(data) {
+    // 1. Esconde o Placeholder
     elements.placeholder.setAttribute('hidden', '');
-    elements.newsText.textContent = data.summary_text;
+
+    // 2. Exibe o Texto (Com formatação de parágrafos <br>)
+    // Usamos innerHTML para converter quebras de linha em visual
+    elements.newsText.innerHTML = data.summary_text.replace(/\n/g, '<br>'); 
     elements.newsText.removeAttribute('hidden');
     
+    // 3. Lógica do Editor (NOVO: Reseta o estado da edição)
+    // Garante que o editor esteja escondido e os botões certos apareçam
+    if (newsEditor) {
+        newsEditor.hidden = true;
+        newsEditor.value = ""; // Limpa lixo anterior
+        editControls.hidden = false; // Mostra a barra de ferramentas (Editar)
+        btnEdit.hidden = false;      // Mostra o botão lápis
+        readModeGroup.hidden = false;
+        saveCancelGroup.hidden = true; // Esconde o Salvar/Cancelar
+    }
+
+    // 4. Configura o Player de Áudio
     if (data.audio_filename && data.audio_filename.endsWith('.mp3')) {
-        const timestamp = new Date().getTime();
+        const timestamp = new Date().getTime(); // Truque anti-cache
         const audioUrl = `${API_BASE_URL}/audio/${data.audio_filename}?t=${timestamp}`;
         
         elements.audioPlayer.src = audioUrl;
         elements.audioPlayer.load();
         elements.playerSection.removeAttribute('hidden');
         
+        // Foco automático no Play para facilitar acessibilidade
         setTimeout(() => {
             elements.playBtn.focus();
             showSuccessToast("Boletim pronto!");
         }, 500);
         
     } else {
+        // Se não tiver áudio, esconde o player e foca no texto
         elements.playerSection.setAttribute('hidden', '');
         elements.newsText.focus();
     }
@@ -376,3 +422,127 @@ function startTicker() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// ========================================
+// LÓGICA DE EDIÇÃO (NOVO)
+// ========================================
+
+function enterEditMode() {
+    // 1. Pega o texto atual (sem HTML)
+    const currentText = elements.newsText.innerText;
+    
+    // 2. Preenche o editor
+    newsEditor.value = currentText;
+    
+    // 3. Troca a visualização
+    elements.newsText.hidden = true;     // Esconde texto fixo
+    newsEditor.hidden = false;           // Mostra caixa de edição
+    newsEditor.focus();                  // Foca para digitar
+    
+    // 4. Troca os botões
+    btnEdit.hidden = true;               // Esconde lápis
+    saveCancelGroup.hidden = false;      // Mostra Salvar/Cancelar
+    saveCancelGroup.style.display = 'flex'; 
+}
+
+function exitEditMode() {
+    // Apenas desfaz a troca visual (cancela)
+    newsEditor.hidden = true;
+    elements.newsText.hidden = false;
+    
+    saveCancelGroup.hidden = true;
+    btnEdit.hidden = false;
+}
+
+function saveTextOnly() {
+    const newText = newsEditor.value;
+    if (!newText.trim()) return alert("Texto vazio!");
+
+    // 1. Atualiza o visual
+    elements.newsText.innerHTML = newText.replace(/\n/g, '<br>');
+    elements.newsText.innerText = newText; // Atualiza o texto puro também
+    
+    // 2. Sai do modo de edição
+    exitEditMode();
+
+    // 3. AVISO IMPORTANTE:
+    // Se mudou o texto, o áudio antigo não serve mais.
+    // Escondemos o player para evitar confusão (Texto diz A, Áudio diz B).
+    elements.playerSection.setAttribute('hidden', '');
+    alert("Texto salvo! ⚠️ O áudio foi ocultado pois não corresponde mais ao texto novo. Gere um novo áudio se desejar ouvir.");
+}
+
+async function copyTextToClipboard() {
+    const text = elements.newsText.innerText;
+    try {
+        await navigator.clipboard.writeText(text);
+        // Feedback visual rápido no botão
+        const originalText = btnCopy.innerHTML;
+        btnCopy.innerHTML = "✅ Copiado!";
+        setTimeout(() => btnCopy.innerHTML = originalText, 2000);
+        showSuccessToast("Texto copiado para a área de transferência!");
+    } catch (err) {
+        showError("Erro ao copiar texto.");
+    }
+}
+
+async function saveAndRegenerateAudio() {
+    const newText = newsEditor.value;
+    
+    // Validação básica
+    if (!newText.trim()) {
+        alert("O texto não pode estar vazio!");
+        return;
+    }
+
+    // Feedback visual (Travando botão)
+    const originalLabel = btnSaveAudio.innerHTML;
+    btnSaveAudio.innerHTML = "⏳ Gerando Áudio...";
+    btnSaveAudio.disabled = true;
+
+    try {
+        // Prepara o envio para a API
+        const payload = {
+            text: newText,
+            // Usa as configs atuais
+            tts_engine: appState.config.tts_engine || "gtts",
+            tts_voice_id: "21m00Tcm4TlvDq8ikWAM"
+        };
+
+        // Chama o endpoint de regeneração
+        const res = await fetch(`${API_BASE_URL}/api/generate-audio`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Erro ao gerar áudio");
+
+        const data = await res.json();
+
+        // SUCESSO!
+        // Atualiza a tela simulando um boletim novo
+        displayBoletim({
+            summary_text: newText,
+            audio_filename: data.audio_filename
+        });
+
+        showSuccessToast("Texto e áudio atualizados!");
+
+    } catch (error) {
+        console.error(error);
+        showError("Erro ao regenerar áudio.");
+        
+        // Em caso de erro, destrava o botão para tentar de novo
+        btnSaveAudio.innerHTML = originalLabel;
+        btnSaveAudio.disabled = false;
+    } finally {
+        // Se deu certo, o displayBoletim já reseta a UI.
+        // Se deu erro, precisamos destravar o botão.
+        // Por segurança, restauramos o botão aqui.
+        if (!btnSaveAudio.disabled) { 
+             // Só restaura se não tiver sido resetado pelo displayBoletim
+             btnSaveAudio.innerHTML = originalLabel;
+        }
+    }
+}

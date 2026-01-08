@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import logging
@@ -42,6 +43,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mapeia a pasta /app/audio para a URL /audio
+# Isso resolve o erro do Player e permite streaming correto
+os.makedirs("/app/audio", exist_ok=True)
+app.mount("/audio", StaticFiles(directory="/app/audio"), name="audio")
 
 # Inicializar serviços
 news_collector = NewsCollector()
@@ -333,21 +339,3 @@ async def save_configuracoes(request: ConfigSaveRequest):
     except Exception as e:
         logger.error(f"Erro ao salvar configurações: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-# --- Rota para servir áudio ---
-@app.get("/audio/{filename}")
-async def serve_audio(filename: str):
-    """
-    Serve arquivos de áudio gerados
-    """
-    audio_path = Path("/app/audio") / filename
-    
-    if not audio_path.exists():
-        logger.error(f"Arquivo de áudio não encontrado: {filename}")
-        raise HTTPException(status_code=404, detail="Arquivo de áudio não encontrado")
-    
-    return FileResponse(
-        path=str(audio_path),
-        media_type="audio/mpeg",
-        filename=filename
-    )

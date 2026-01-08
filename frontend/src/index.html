@@ -33,6 +33,31 @@
                 <div class="news-text" id="newsText" hidden>
                     <!-- Texto do boletim aparece aqui -->
                 </div>
+                <textarea id="newsEditor" class="news-editor" hidden aria-label="Editor de texto do boletim"></textarea>
+
+                <div class="edit-controls" id="editControls" hidden>
+                    
+                    <div id="readModeGroup" style="display: flex; gap: 10px;">
+                        <button id="btnCopy" class="control-btn-text" aria-label="Copiar texto para área de transferência">
+                            📋 Copiar Texto
+                        </button>
+                        <button id="btnEdit" class="control-btn-text" aria-label="Editar texto">
+                            ✏️ Editar Texto
+                        </button>
+                    </div>
+                    
+                    <div id="saveCancelGroup" hidden style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+                        <button id="btnSaveTextOnly" class="control-btn-text" aria-label="Salvar apenas o texto">
+                            💾 Salvar Texto
+                        </button>
+                        <button id="btnSaveAudio" class="control-btn-text save" aria-label="Salvar texto e gerar novo áudio">
+                            🎙️ Salvar e Gerar Áudio
+                        </button>
+                        <button id="btnCancelEdit" class="control-btn-text cancel" aria-label="Cancelar edição">
+                            ❌ Cancelar
+                        </button>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -117,57 +142,66 @@
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h2>⚙️ Configurações</h2>
-            <button class="close-btn" id="closeSidebar" aria-label="Fechar">✕</button>
+            <button class="close-btn" id="closeSidebar" aria-label="Fechar configurações">×</button>
         </div>
-        
+
         <div class="sidebar-content">
-            <!-- Configurações de Sumarização -->
+            
             <div class="config-group">
-                <h3>🤖 Sumarização com IA</h3>
-                <label for="summaryMode">Modo:</label>
+                <h3>🧠 Inteligência Artificial</h3>
+                
+                <label for="summaryMode">Motor de Resumo:</label>
                 <select id="summaryMode">
-                    <option value="groq">Groq (Rápida e Gratuita)</option>
-                    <option value="none">Simples (Sem IA)</option>
+                    <option value="groq">Groq (Llama 3) - Rápido</option>
+                    <option value="openai">OpenAI (GPT-4) - Pago</option>
+                    <option value="local">Ollama (Local) - Lento</option>
                 </select>
 
-                <label for="groqKey">Chave API Groq:</label>
-                <input type="password" id="groqKey" placeholder="gsk_...">
+                <label for="groqKey">Chave API (Groq/OpenAI):</label>
+                <input type="password" id="groqKey" placeholder="Sua chave...">
             </div>
 
-            <!-- Configurações de Áudio -->
             <div class="config-group">
-                <h3>🔊 Geração de Áudio</h3>
-                <label for="ttsEngine">Motor TTS:</label>
+                <h3>🗣️ Voz e Narração</h3>
+                
+                <label for="ttsEngine">Motor de Voz:</label>
                 <select id="ttsEngine">
-                    <option value="gtts">Google TTS (Gratuito)</option>
-                    <option value="elevenlabs">ElevenLabs (Premium)</option>
+                    <option value="gtts">Google TTS (Gratuito/Robótico)</option>
+                    <option value="elevenlabs">ElevenLabs (Premium/Realista)</option>
+                    <option value="openai">OpenAI TTS (Pago)</option>
                 </select>
 
-                <label for="elevenLabsKey">Chave ElevenLabs:</label>
-                <input type="password" id="elevenLabsKey" placeholder="sk_...">
+                <label for="elevenLabsKey">Chave API ElevenLabs:</label>
+                <input type="password" id="elevenLabsKey" placeholder="Sua chave...">
             </div>
 
-            <!-- Configurações de Notícias -->
             <div class="config-group">
                 <h3>📰 Coleta de Notícias</h3>
+                
+                <label for="articlesPerCategory">Notícias por Categoria:</label>
+                <input type="number" id="articlesPerCategory" value="3" min="1" max="10">
+                <p style="font-size: 0.8rem; color: #a0aec0; margin-top: 5px; margin-bottom: 10px;">
+                    Quantidade de matérias por tema.
+                </p>
+
                 <label for="gnewsKey">Chave API GNews:</label>
                 <input type="password" id="gnewsKey" placeholder="Sua chave...">
             </div>
 
-            <!-- Estilo do Boletim -->
             <div class="config-group">
-    <h3>📰 Coleta de Notícias</h3>
-    
-    <label for="articlesPerCategory">Notícias por Categoria:</label>
-    <input type="number" id="articlesPerCategory" value="3" min="1" max="10">
-    <p style="font-size: 0.8rem; color: #a0aec0; margin-top: 5px;">
-        Isso define quantas notícias buscar de cada assunto selecionado.
-    </p>
-    <label for="gnewsKey">Chave API GNews:</label>
-    <input type="password" id="gnewsKey" placeholder="Sua chave...">
-</div>
+                <h3>🎨 Estilo Editorial</h3>
+                <label for="boletimStyle">Tom da Locução:</label>
+                <select id="boletimStyle">
+                    <option value="jornalistico">Jornalístico (Sério)</option>
+                    <option value="descontraido">Descontraído (Podcast)</option>
+                    <option value="urgente">Urgente (Breaking News)</option>
+                </select>
+            </div>
 
-            <button class="save-btn" id="saveConfigBtn">💾 Salvar Configurações</button>
+            <button id="saveConfigBtn" class="save-btn">
+                💾 Salvar Preferências
+            </button>
+
         </div>
     </aside>
 

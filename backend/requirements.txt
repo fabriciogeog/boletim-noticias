@@ -1,36 +1,10 @@
-# FastAPI e servidor
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-multipart==0.0.6
-
-# HTTP e requests (Para o GNews)
-httpx>=0.25.2,<0.26.0
-aiohttp==3.9.1
-
-# APIs de IA (Sumarização e Voz)
-# ================================================================
-# CORREÇÃO: Usando a versão que o seu log de build confirmou existir
-# ================================================================
-google-generativeai>=0.8.0
-elevenlabs==1.2.1
-
-# TTS - Motores de Voz (gTTS é nosso fallback)
-gTTS>=2.5.0
-
-# Processamento de áudio
-pydub==0.25.1
-soundfile==0.12.1
-
-# Utilidades
-python-dateutil==2.8.2
-pytz==2023.3
-pydantic==2.5.3
-pydantic-settings==2.1.0
-
-# Logging e monitoramento
-python-json-logger==2.0.7
-
-# Database (SQLite)
-sqlalchemy==2.0.25
-alembic==1.13.1
-groq>=0.4.0
+fastapi
+uvicorn
+python-dotenv
+httpx
+gTTS
+pydub
+groq
+openai>=1.0.0
+watchfiles
+sqlalchemy
