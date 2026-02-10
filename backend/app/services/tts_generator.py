@@ -105,9 +105,9 @@ class TTSGenerator:
             # O Google fala devagar, então aceleramos. OpenAI/ElevenLabs já têm ritmo bom.
             if tts_engine == "gtts" and AudioSegment and temp_path:
                 try:
-                    logger.info("⚡ Acelerando áudio gTTS em 15%...")
+                    logger.info("⚡ Acelerando áudio gTTS em 20%...")
                     audio = AudioSegment.from_mp3(str(temp_path))
-                    faster_audio = audio.speedup(playback_speed=1.15)
+                    faster_audio = audio.speedup(playback_speed=1.20)
                     faster_audio.export(str(output_path), format="mp3", bitrate="192k")
                     # Limpa temporário
                     if temp_path != output_path and temp_path.exists():

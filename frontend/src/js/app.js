@@ -12,8 +12,7 @@ const btnCancelEdit = document.getElementById('btnCancelEdit');
 const readModeGroup = document.getElementById('readModeGroup');
 const btnCopy = document.getElementById('btnCopy');
 const btnSaveTextOnly = document.getElementById('btnSaveTextOnly');
-
-// Elementos de Interface já existentes (Só para conferência)
+const resetBtn = document.getElementById('resetBtn');
 const newsText = document.getElementById('newsText');
 const playerSection = document.getElementById('playerSection');
 const audioPlayer = document.getElementById('audioPlayer');
@@ -68,6 +67,7 @@ const elements = {
     
     // Generate
     generateBtn: document.getElementById('generateBtn'),
+    resetBtn: document.getElementById('resetBtn'),
     loadingOverlay: document.getElementById('loadingOverlay'),
     
     // Ticker
@@ -127,6 +127,7 @@ function setupEventListeners() {
     btnSaveAudio.addEventListener('click', saveAndRegenerateAudio);
     btnCopy.addEventListener('click', copyTextToClipboard);
     btnSaveTextOnly.addEventListener('click', saveTextOnly);
+    if (resetBtn) resetBtn.addEventListener('click', resetInterface);
 }
 
 function setupKeyboardShortcuts() {
@@ -264,39 +265,40 @@ function displayBoletim(data) {
     // 1. Esconde o Placeholder
     elements.placeholder.setAttribute('hidden', '');
 
-    // 2. Exibe o Texto (Com formatação de parágrafos <br>)
-    // Usamos innerHTML para converter quebras de linha em visual
+    // 2. Exibe o Texto e ATUALIZA O LETREIRO (Breaking News)
     elements.newsText.innerHTML = data.summary_text.replace(/\n/g, '<br>'); 
     elements.newsText.removeAttribute('hidden');
     
-    // 3. Lógica do Editor (NOVO: Reseta o estado da edição)
-    // Garante que o editor esteja escondido e os botões certos apareçam
+    // --- LINHA NOVA ADICIONADA AQUI ---
+    updateTickerWithNews(data.summary_text); 
+    // ----------------------------------
+
+    // 3. Lógica do Editor (Reseta o estado da edição)
     if (newsEditor) {
         newsEditor.hidden = true;
-        newsEditor.value = ""; // Limpa lixo anterior
-        editControls.hidden = false; // Mostra a barra de ferramentas (Editar)
-        btnEdit.hidden = false;      // Mostra o botão lápis
-        readModeGroup.hidden = false;
-        saveCancelGroup.hidden = true; // Esconde o Salvar/Cancelar
+        newsEditor.value = ""; 
+        editControls.hidden = false; 
+        btnEdit.hidden = false;      
+        saveCancelGroup.hidden = true; 
+        // Se você incluiu o botão Copiar/Grupo de leitura:
+        if (typeof readModeGroup !== 'undefined') readModeGroup.hidden = false;
     }
 
     // 4. Configura o Player de Áudio
     if (data.audio_filename && data.audio_filename.endsWith('.mp3')) {
-        const timestamp = new Date().getTime(); // Truque anti-cache
+        const timestamp = new Date().getTime();
         const audioUrl = `${API_BASE_URL}/audio/${data.audio_filename}?t=${timestamp}`;
         
         elements.audioPlayer.src = audioUrl;
         elements.audioPlayer.load();
         elements.playerSection.removeAttribute('hidden');
         
-        // Foco automático no Play para facilitar acessibilidade
         setTimeout(() => {
             elements.playBtn.focus();
             showSuccessToast("Boletim pronto!");
         }, 500);
         
     } else {
-        // Se não tiver áudio, esconde o player e foca no texto
         elements.playerSection.setAttribute('hidden', '');
         elements.newsText.focus();
     }
@@ -545,4 +547,58 @@ async function saveAndRegenerateAudio() {
              btnSaveAudio.innerHTML = originalLabel;
         }
     }
+}
+
+
+// ========================================
+// ATUALIZAR O LETREIRO (BREAKING NEWS)
+// ========================================
+function updateTickerWithNews(text) {
+    if (!elements.tickerContent) return;
+
+    // 1. Remove quebras de linha e espaços extras do texto original
+    const cleanText = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // 2. Monta a string única com separadores chamativos
+    const tickerText = `🚨 ÚLTIMAS NOTÍCIAS: ${cleanText} • 🚨 BREAKING NEWS: ${cleanText} • `;
+
+    // 3. Insere no HTML (repetimos o texto para garantir que não haja vácuo na rolagem)
+    elements.tickerContent.innerHTML = tickerText + tickerText;
+    
+    // 4. Reinicia a animação
+    elements.tickerContent.style.animation = 'none';
+    elements.tickerContent.offsetHeight; // Reset técnico
+    
+    // Ajuste a velocidade aqui (ex: 60s para texto longo, 30s para curto)
+    elements.tickerContent.style.animation = 'scroll 160s linear infinite';
+}
+
+function resetInterface() {
+    console.log("🧹 Limpando interface...");
+
+    // 1. Para o áudio e remove a origem
+    if (elements.audioPlayer) {
+        elements.audioPlayer.pause();
+        elements.audioPlayer.src = "";
+    }
+
+    // 2. Esconde as áreas de conteúdo
+    elements.playerSection.setAttribute('hidden', '');
+    elements.newsText.setAttribute('hidden', '');
+    
+    // 3. Se o editor estiver aberto, fecha-o
+    if (typeof newsEditor !== 'undefined') newsEditor.hidden = true;
+    if (typeof editControls !== 'undefined') editControls.hidden = true;
+
+    // 4. Mostra o placeholder original
+    elements.placeholder.removeAttribute('hidden');
+
+    // 5. Opcional: Limpa o letreiro (Ticker)
+    if (elements.tickerContent) {
+        elements.tickerContent.textContent = "🎙️ Sistema Operacional • Aguardando...";
+        elements.tickerContent.style.animation = 'none';
+    }
+
+    // Joga o foco para o topo para acessibilidade (NVDA)
+    document.querySelector('h1').focus();
 }

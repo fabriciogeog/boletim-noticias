@@ -389,7 +389,7 @@ body::after {
    ======================================== */
 .ticker-footer {
     background: rgba(10, 14, 39, 0.95);
-    border-top: 2px solid var(--primary);
+    border-top: 2px solid #ff3366; /* Cor de urgência (Danger) */
     position: fixed;
     bottom: 0;
     left: 0;
@@ -405,12 +405,12 @@ body::after {
 }
 
 .ticker-content {
-    display: inline-block;
-    white-space: nowrap;
-    padding-left: 100%;
-    animation: scroll 60s linear infinite;
-    font-size: 1.1rem;
-    color: var(--primary);
+    white-space: nowrap;    /* IMPEDE A QUEBRA DE LINHA (Fundamental) */
+    display: inline-block;  /* Permite que o elemento role corretamente */
+    padding-left: 100%;     /* Faz o texto começar fora da tela à direita */
+    color: #00d9ff; 
+    font-weight: bold;
+    text-transform: uppercase;
 }
 
 /* ========================================
@@ -681,4 +681,33 @@ body::after {
 .control-btn-text.cancel:hover {
     background: var(--danger);
     color: white;
+}
+
+/* Grupo de botões para ficarem lado a lado */
+.button-group {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+/* Estilo do Botão Limpar */
+.reset-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #a0a0a0;
+    padding: 12px 25px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.reset-btn:hover {
+    background: rgba(255, 59, 59, 0.1);
+    border-color: #ff3b3b;
+    color: #ff3b3b;
 }

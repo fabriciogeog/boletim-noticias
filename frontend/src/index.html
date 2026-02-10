@@ -111,11 +111,16 @@
 
         <!-- Generate Button -->
         <div class="generate-section">
-            <button class="generate-btn" id="generateBtn">
-                <span class="btn-icon">🎤</span>
-                <span class="btn-text">GERAR BOLETIM</span>
-            </button>
-        </div>
+    <div class="button-group">
+        <button type=button class="reset-btn" id="resetBtn" aria-label="Limpar tela para novo boletim">
+            🗑️ Limpar
+        </button>
+        <button class="generate-btn" id="generateBtn">
+            <span class="btn-icon">🎤</span>
+            <span class="btn-text">GERAR BOLETIM</span>
+        </button>
+    </div>
+</div>
 
         <!-- Loading Overlay -->
         <div class="loading-overlay" id="loadingOverlay" style="display: none;" aria-live="assertive">
@@ -130,7 +135,7 @@
     </main>
 
     <!-- News Ticker -->
-    <footer class="ticker-footer">
+    <footer class="ticker-footer" aria-hidden="true">
         <div class="ticker">
             <div class="ticker-content" id="tickerContent">
                 📊 Carregando notícias mais recentes...

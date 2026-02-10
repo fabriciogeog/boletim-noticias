@@ -1,175 +1,112 @@
+import os
 import logging
 from typing import List, Dict
-import os
-from datetime import datetime
+from groq import Groq
 
 logger = logging.getLogger(__name__)
 
 class NewsSummarizer:
-    """
-    Sumarizador com Groq (ultra-rápido e gratuito)
-    Fallback para resumo simples se Groq não estiver disponível
-    """
-    
     def __init__(self):
-        self.groq_api_key = os.getenv("GROQ_API_KEY")
-        self.default_summary_mode = os.getenv("AI_SUMMARY_MODE", "none").lower()
-        
-        if self.groq_api_key and self.default_summary_mode == "groq":
-            try:
-                from groq import Groq
-                self.groq_client = Groq(api_key=self.groq_api_key)
-                logger.info("✓ Sumarizador Groq (Nuvem) inicializado.")
-            except ImportError:
-                logger.error("✗ Biblioteca 'groq' não encontrada. Instale com: pip install groq")
-                self.groq_client = None
-            except Exception as e:
-                logger.error(f"✗ Falha ao inicializar Groq (verifique a API Key): {e}")
-                self.groq_client = None
-        else:
-            self.groq_client = None
-            logger.warning("="*50)
-            logger.warning("Sumarização com IA (Groq) está DESABILITADA (sem chave ou modo 'none').")
-            logger.warning("Usando o modo de fallback (lista de notícias simples).")
-            logger.warning("="*50)
+        self.api_key = os.getenv("GROQ_API_KEY")
+        self.client = Groq(api_key=self.api_key) if self.api_key else None
+        self.model = "llama-3.3-70b-versatile"
 
     async def summarize(
-        self,
-        articles: List[Dict],
+        self, 
+        articles: List[Dict], 
         style: str = "jornalistico",
         include_intro: bool = True,
         include_outro: bool = True,
-        summary_mode: str = None
+        summary_mode: str = "groq"
     ) -> str:
-        """
-        Gera o roteiro do boletim. Tenta usar IA (Groq) se disponível
-        e habilitado, senão, usa o fallback simples.
-        """
-        if not articles:
-            return "Nenhuma notícia disponível no momento."
+        if not articles or not isinstance(articles, list):
+            return "Nenhuma notícia válida para resumir."
 
-        mode = summary_mode or self.default_summary_mode
-
-        if mode == "groq" and self.groq_client:
-            logger.info(f"Sumarizando {len(articles)} artigos com Groq (Nuvem)...")
-            try:
-                prompt = self._create_groq_prompt(articles, style, include_intro, include_outro)
-                
-                # Chama a API do Groq (compatível com OpenAI)
-                response = self.groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",  # Modelo rápido e gratuito
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "Você é um roteirista profissional de rádio. Crie roteiros fluidos, naturais e envolventes para áudio."
-                        },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
-                    temperature=0.7,
-                    max_tokens=2000
-                )
-                
-                roteiro = response.choices[0].message.content
-                
-                # Adiciona créditos das fontes
-                source_names = self._get_source_credits(articles)
-                credits = f"\n\nEste boletim teve informações de {source_names}."
-                
-                logger.info("✓ Sumarização com Groq concluída com sucesso!")
-                return roteiro + credits
-                
-            except Exception as e:
-                logger.error(f"✗ Erro ao sumarizar com Groq: {e}")
-                logger.warning("Revertendo para o modo de fallback (lista simples)...")
-                return self._create_simple_summary(articles, include_intro, include_outro)
-        else:
-            logger.info(f"Gerando resumo simples (fallback) para {len(articles)} artigos.")
-            return self._create_simple_summary(articles, include_intro, include_outro)
-    
-    def _create_simple_summary(
-        self,
-        articles: List[Dict],
-        include_intro: bool,
-        include_outro: bool
-    ) -> str:
-        """ Cria resumo simples sem LLM (fallback) """
-        lines = []
-        
-        if include_intro:
-            now = datetime.now()
-            periodo = "Bom dia" if now.hour < 12 else "Boa tarde" if now.hour < 18 else "Boa noite"
-            lines.append(f"{periodo}! Estas são as principais notícias de hoje.\n")
-        
-        for article in articles:
-            title = article.get('title', '')
-            summary = article.get('summary', '')
+        # --- EXTRAÇÃO DE FONTES "RAIO-X" ---
+        nomes_fontes = []
+        for art in articles:
+            if not isinstance(art, dict): continue
             
-            if summary:
-                summary = summary.replace('\n', ' ').replace('\r', ' ')
-                lines.append(f"{title}. {summary}\n")
-            else:
-                lines.append(f"{title}.\n")
-        
-        source_names = self._get_source_credits(articles)
-        if source_names:
-            lines.append(f"\nEste boletim teve informações de {source_names}.")
-        
-        if include_outro:
-            lines.append("\nEssas foram as principais notícias. Até a próxima!")
-        
-        return "\n".join(lines)
+            fonte = art.get('source', {})
+            nome = None
+            
+            if isinstance(fonte, dict):
+                nome = fonte.get('name') or fonte.get('title')
+            elif isinstance(fonte, str):
+                nome = fonte
+                
+            if not nome and art.get('url'):
+                url = art.get('url').lower()
+                if 'g1' in url: nome = 'G1'
+                elif 'uol' in url: nome = 'UOL'
+                elif 'estadao' in url: nome = 'Estadão'
+                elif 'folha' in url: nome = 'Folha de S.Paulo'
+                elif 'cnn' in url: nome = 'CNN Brasil'
+                elif 'terra' in url: nome = 'Portal Terra'
+            
+            if nome:
+                nomes_fontes.append(nome.strip())
 
-    def _get_source_credits(self, articles: List[Dict]) -> str:
-        """ Pega os nomes das fontes para os créditos. """
-        source_names = set()
-        for article in articles:
-            source = article.get('source')
-            if source and source != 'Fonte desconhecida':
-                source_names.add(source)
-        return ", ".join(source_names)
+        fontes_unicas = sorted(list(set(nomes_fontes)))
+        lista_fontes_str = ", ".join(fontes_unicas) if fontes_unicas else "G1, UOL e agências de notícias"
 
-    def _format_articles_for_prompt(self, articles: List[Dict]) -> str:
-        """ Formata artigos para o prompt do Groq. """
-        formatted = []
-        for i, article in enumerate(articles, 1):
-            formatted.append(
-                f"Notícia {i} (Categoria: {article.get('category')}, Fonte: {article.get('source')}):\n"
-                f"Título: {article.get('title')}\n"
-                f"Descrição: {article.get('summary')}\n---"
-            )
-        return "\n".join(formatted)
+        # --- PREPARAÇÃO DO CONTEÚDO ---
+        contexto = ""
+        for i, art in enumerate(articles, 1):
+            if isinstance(art, dict):
+                titulo = art.get('title', 'Notícia sem título')
+                desc = art.get('description', 'Sem detalhes adicionais.')
+                contexto += f"NOTÍCIA {i}: {titulo}. DETALHES: {desc}\n\n"
 
-    def _create_groq_prompt(
-        self,
-        articles: List[Dict],
-        style: str,
-        include_intro: bool,
-        include_outro: bool
-    ) -> str:
-        """ Cria o prompt otimizado para o Groq. """
-        
-        articles_text = self._format_articles_for_prompt(articles)
-        
-        prompt = f"""
-Você é um âncora de rádio experiente. Sua tarefa é transformar a lista de notícias cruas abaixo em um roteiro de áudio fluido e natural.
+        # --- PROMPT ---
+        system_instruction = (
+            "Você é um redator sênior de rádio. Estilo formal e direto. "
+            "Siga rigorosamente estas regras:\n"
+            "1. FORMATO: Manchete impactante seguida de um resumo explicativo de 2 frases.\n"
+            "2. CORTE SECO: Sem conectivos entre as notícias.\n"
+            "3. FONTES: Você DEVE usar APENAS a lista de fontes fornecida. PROIBIDO dizer 'Fontes Diversas'.\n"
+            "4. ENCERRAMENTO: Use exatamente a frase: 'Este boletim teve informações de: [LISTA]'."
+        )
 
-REGRAS DE OURO:
-1.  **Fidelidade ao Tema:** Se as notícias forem todas do mesmo assunto (ex: só Economia), NÃO invente transições como "Mudando de assunto" ou "No cenário internacional". Apenas conecte uma notícia à outra de forma lógica (ex: "Ainda sobre o mercado...", "Por outro lado...").
-2.  **Tom:** {style} (Adapte o vocabulário: Formal para jornalístico, leve para conversacional).
-3.  **Estrutura:** Texto corrido, sem tópicos. Use pontuação adequada para a respiração do locutor.
-4.  **Conteúdo:** Resuma cada notícia em 1 ou 2 frases curtas. Vá direto ao ponto.
-5.  **Proibido:** Não cite nomes de jornais (G1, Folha) no texto. Os créditos vão no final.
-6.  {'**Abertura:** Comece com uma saudação rápida.' if include_intro else 'Comece direto na primeira notícia.'}
-7.  {'**Fechamento:** Encerre convidando para a próxima edição.' if include_outro else 'Encerre após a última notícia.'}
+        user_prompt = f"""
+        Escreva o boletim com base nestas notícias:
+        {contexto}
 
-Notícias para locução:
----
-{articles_text}
----
+        LISTA DE FONTES OBRIGATÓRIA: {lista_fontes_str}
 
-Gere APENAS o texto final para ser lido.
-"""
-        return prompt
+        ESTRUTURA:
+        {'1. Introdução breve.' if include_intro else ''}
+        2. Notícias com manchete e resumo (Corte Seco).
+        {'3. Encerramento citando a LISTA DE FONTES OBRIGATÓRIA.' if include_outro else ''}
+        """
+
+        try:
+            if summary_mode == "groq" and self.client:
+                logger.info(f"Sumarizando com fontes: {lista_fontes_str}")
+                # CORREÇÃO: .chat.completions.create em vez de .chat.create
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    temperature=0.3
+                )
+                return completion.choices[0].message.content
+            
+            return self._simple_format(articles, include_intro, include_outro, lista_fontes_str)
+
+        except Exception as e:
+            logger.error(f"Erro na IA: {e}")
+            # Em caso de erro, retorna o formato simples em vez de uma mensagem de erro crua
+            return self._simple_format(articles, include_intro, include_outro, lista_fontes_str)
+
+    def _simple_format(self, articles, intro, outro, fontes_str):
+        """Fallback formatado para quando a IA falha"""
+        texto = "Boletim de notícias (Modo de Segurança).\n\n" if intro else ""
+        for art in articles:
+            if isinstance(art, dict):
+                texto += f"{art.get('title', 'Notícia')}. {art.get('description', '')}\n\n"
+        if outro:
+            texto += f"Este boletim teve informações de: {fontes_str}."
+        return texto

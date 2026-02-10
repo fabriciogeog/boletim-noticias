@@ -5,8 +5,8 @@ services:
   api:
     build: ./backend
     container_name: boletim-api
-    ports:
-      - "8000:8000"
+   # ports:
+   #   - "8000:8000"
     volumes:
       - ./backend/app:/app
       - ./data:/app/data
