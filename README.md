@@ -1,62 +1,70 @@
-# 📻 Sistema de Boletim de Notícias
+📻 Sistema de Boletim de Notícias
+Sistema automatizado para geração de boletins de notícias, desenvolvido com foco em acessibilidade e autonomia para locutores de rádio que utilizam leitores de tela.
 
-Sistema automatizado para geração de boletins de notícias, desenvolvido especialmente para acessibilidade e uso por locutores de rádio.
+O sistema agora permite o uso híbrido, funcionando tanto em notebooks quanto em smartphones via rede local (intranet), com interface otimizada para gestos de toque.
 
-> **Arquitetura Leve e Rápida**: Funciona em qualquer máquina usando Docker, com processamento de notícias e áudio via APIs de nuvem.
+🎯 Características Principais
+✅ Coleta Inteligente: Notícias em tempo real via GNews.io.
 
----
+🎙️ Processamento via IA: Sumarização profissional utilizando Groq.
 
-## 🎯 Características Principais
+🔊 Narração Versátil: Suporte para gTTS (Google) e vozes premium da ElevenLabs.
 
-- ✅ **Coleta Automática de Notícias** via API **GNews.io**
-- 🎙️ **Geração de Áudio Rápida** com Text-to-Speech via **gTTS** (Voz do Google)
-- ♿ **100% Acessível** com navegação por teclado e compatível com leitores de tela
-- 🐋 **Docker** para instalação e execução simplificadas
-- ⚡ **Extremamente Leve** - Não requer GPU ou hardware de IA.
-- 🔄 **Cross-Platform** - Mesma arquitetura em Linux e Windows
+📱 Mobile-Friendly: Design responsivo com botões grandes e áreas de toque otimizadas para TalkBack e VoiceOver.
 
----
+♿ Acessibilidade Plena: Navegação por teclado, atalhos dedicados e compatibilidade total com NVDA.
 
-## 📋 Requisitos
+🐋 Arquitetura Docker: Execução simplificada em Ubuntu 24.04 e Windows.
 
-### Software
-- **Docker Desktop** (Windows/Mac) ou **Docker Engine** (Linux)
-- **Docker Compose** v1.29+
-- **Navegador moderno** (Chrome, Firefox, Edge)
+📋 Requisitos e APIs
+Software
+Docker e Docker Compose.
 
-### Hardware Mínimo
-- **RAM**: 2GB
-- **Disco**: 1GB livre
-- **CPU**: Qualquer processador 64-bit
-- **Internet**: **Conexão de internet ativa é essencial** para coletar notícias (GNews) e gerar áudio (gTTS).
+Navegador: Chrome ou Safari (recomendados para mobile).
 
-### 🔑 Chave de API (Obrigatório)
+🔑 Chaves de API (Configurar no arquivo .env)
+Este projeto utiliza três motores principais:
 
-Este projeto **requer** uma chave de API do **GNews.io**.
+GNews.io: Coleta de notícias.
 
-1.  Cadastre-se no plano gratuito em [https://gnews.io/](https://gnews.io/)
-2.  Copie sua Chave de API (API Key) do seu painel.
-3.  Você precisará dela durante a instalação (Passo 2).
+Groq: Sumarização das notícias via IA.
 
----
+ElevenLabs (Opcional): Para narração de alta fidelidade.
 
-## 🚀 Instalação Rápida (Linux / macOS)
+🚀 Instalação e Execução
+1. Preparação
+2. Inicialização
+Para subir o sistema no host (Ubuntu ou Windows):
 
-```bash
-# 1. Clonar repositório
-git clone [https://github.com/seu-usuario/boletim-noticias.git](https://github.com/seu-usuario/boletim-noticias.git)
-cd boletim-noticias
+🌐 Configuração de Rede Local (Mobile)
+Para que um colega acesse o sistema pelo smartphone na mesma rede Wi-Fi:
 
-# 2. Configurar sua Chave de API
-# Copie o arquivo de exemplo
-cp .env.example .env
+No Host: Descubra o IP da máquina (ex: 192.168.1.15).
 
-# Abra o .env e cole sua chave do GNews
-nano .env
+No Código: No arquivo frontend/src/js/app.js, altere a variável API_BASE_URL para o IP do host (ex: http://192.168.1.15:8000).
 
-# 3. Instalar e iniciar
-make install
-make start
+No Celular: Acesse no navegador http://IP-DO-HOST:3000.
 
-# 4. Acessar
-http://localhost:3000
+Dica: Adicione o site à "Tela de Início" do celular para usá-lo como um aplicativo nativo.
+
+📂 Scripts de Manutenção
+O projeto inclui scripts automatizados para facilitar a gestão:
+
+./sync_git.sh: Sincroniza as alterações de código com o GitHub.
+
+./migrar_dados.sh exportar: Cria um backup completo (.tar.gz) dos áudios, banco de dados e configurações para migração.
+
+./migrar_dados.sh importar: Restaura o sistema a partir de um arquivo de backup em um novo host.
+
+♿ Acessibilidade e Atalhos
+O sistema responde aos seguintes comandos de teclado no navegador:
+
+Espaço ou K: Inicia ou pausa a reprodução do áudio.
+
+J / L: Retrocede ou avança 5 segundos no áudio.
+
+ESC: Fecha menus de configuração e sobreposições.
+
+Botão Copiar: Implementado com fallback para funcionar em dispositivos móveis via rede local sem HTTPS.
+
+Desenvolvido para promover a inclusão digital e a autonomia profissional de locutores cegos.
