@@ -5,8 +5,9 @@ services:
   api:
     build: ./backend
     container_name: boletim-api
-   # ports:
-   #   - "8000:8000"
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
     volumes:
       - ./backend/app:/app
       - ./data:/app/data
@@ -30,11 +31,12 @@ services:
       - boletim-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      # O comando abaixo usa o Python para tentar abrir a URL de configuração da API
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/config')"]
       interval: 30s
       timeout: 10s
       retries: 3
-
+      start_period: 30s
   # ========================================
   # Frontend - Nginx
   # ========================================

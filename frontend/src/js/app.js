@@ -23,7 +23,9 @@ const currentTimeDisplay = document.getElementById('currentTime');
 // ========================================
 // CONFIGURAÇÕES E ESTADO
 // ========================================
-const API_BASE_URL = 'http://localhost:8000';
+// const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://192.168.15.23:8000';
+
 
 const appState = {
     selectedCategories: ['geral'],
@@ -476,16 +478,53 @@ function saveTextOnly() {
 
 async function copyTextToClipboard() {
     const text = elements.newsText.innerText;
-    try {
-        await navigator.clipboard.writeText(text);
-        // Feedback visual rápido no botão
+    
+    // Função auxiliar para feedback visual e auditivo
+    const setSuccessUI = () => {
         const originalText = btnCopy.innerHTML;
         btnCopy.innerHTML = "✅ Copiado!";
         setTimeout(() => btnCopy.innerHTML = originalText, 2000);
         showSuccessToast("Texto copiado para a área de transferência!");
+    };
+
+    // 1. Tenta o método moderno (Funciona em localhost ou HTTPS)
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            setSuccessUI();
+            return;
+        } catch (err) {
+            console.warn("Clipboard API falhou, tentando fallback...", err);
+        }
+    }
+
+    // 2. Método Fallback (Funciona em HTTP e Redes Locais)
+    // Criamos um elemento invisível para o sistema de cópia antigo
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    
+    // Garante que o elemento não apareça na tela mas seja acessível
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    document.body.appendChild(textArea);
+    
+    textArea.focus();
+    textArea.select();
+
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            setSuccessUI();
+        } else {
+            showError("Não foi possível copiar automaticamente.");
+        }
     } catch (err) {
+        console.error("Erro ao copiar no fallback:", err);
         showError("Erro ao copiar texto.");
     }
+
+    document.body.removeChild(textArea);
 }
 
 async function saveAndRegenerateAudio() {
