@@ -14,14 +14,15 @@ DATABASE_URL = f"sqlite:///{DATABASE_FILE}"
 try:
     # Garante que o diretório /app/data exista
     os.makedirs(os.path.dirname(DATABASE_FILE), exist_ok=True)
-    
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-    
+
+    engine = create_engine(DATABASE_URL, connect_args={
+                           "check_same_thread": False})
+
     # Configuração para sessões de banco de dados
     db_session = scoped_session(sessionmaker(autocommit=False,
                                              autoflush=False,
                                              bind=engine))
-    
+
     Base = declarative_base()
     Base.query = db_session.query_property()
 
@@ -50,16 +51,19 @@ class Boletim(Base):
 
 # --- Função de Inicialização ---
 
+
 def init_db():
     """
     Cria a tabela no banco de dados se ela não existir.
     """
     if engine is None:
-        logger.error("Motor de banco de dados não inicializado. Tabelas não podem ser criadas.")
+        logger.error(
+            "Motor de banco de dados não inicializado. Tabelas não podem ser criadas.")
         return
-        
+
     try:
-        logger.info("Inicializando o banco de dados e criando tabelas (se não existirem)...")
+        logger.info(
+            "Inicializando o banco de dados e criando tabelas (se não existirem)...")
         Base.metadata.create_all(bind=engine)
         logger.info("✓ Banco de dados pronto.")
     except Exception as e:

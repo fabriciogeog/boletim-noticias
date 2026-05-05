@@ -5,6 +5,7 @@ from groq import Groq
 
 logger = logging.getLogger(__name__)
 
+
 class NewsSummarizer:
     def __init__(self):
         self.api_key = os.getenv("GROQ_API_KEY")
@@ -12,8 +13,8 @@ class NewsSummarizer:
         self.model = "llama-3.3-70b-versatile"
 
     async def summarize(
-        self, 
-        articles: List[Dict], 
+        self,
+        articles: List[Dict],
         style: str = "jornalistico",
         include_intro: bool = True,
         include_outro: bool = True,
@@ -25,30 +26,38 @@ class NewsSummarizer:
         # --- EXTRAÇÃO DE FONTES "RAIO-X" ---
         nomes_fontes = []
         for art in articles:
-            if not isinstance(art, dict): continue
-            
+            if not isinstance(art, dict):
+                continue
+
             fonte = art.get('source', {})
             nome = None
-            
+
             if isinstance(fonte, dict):
                 nome = fonte.get('name') or fonte.get('title')
             elif isinstance(fonte, str):
                 nome = fonte
-                
+
             if not nome and art.get('url'):
                 url = art.get('url').lower()
-                if 'g1' in url: nome = 'G1'
-                elif 'uol' in url: nome = 'UOL'
-                elif 'estadao' in url: nome = 'Estadão'
-                elif 'folha' in url: nome = 'Folha de S.Paulo'
-                elif 'cnn' in url: nome = 'CNN Brasil'
-                elif 'terra' in url: nome = 'Portal Terra'
-            
+                if 'g1' in url:
+                    nome = 'G1'
+                elif 'uol' in url:
+                    nome = 'UOL'
+                elif 'estadao' in url:
+                    nome = 'Estadão'
+                elif 'folha' in url:
+                    nome = 'Folha de S.Paulo'
+                elif 'cnn' in url:
+                    nome = 'CNN Brasil'
+                elif 'terra' in url:
+                    nome = 'Portal Terra'
+
             if nome:
                 nomes_fontes.append(nome.strip())
 
         fontes_unicas = sorted(list(set(nomes_fontes)))
-        lista_fontes_str = ", ".join(fontes_unicas) if fontes_unicas else "G1, UOL e agências de notícias"
+        lista_fontes_str = ", ".join(
+            fontes_unicas) if fontes_unicas else "G1, UOL e agências de notícias"
 
         # --- PREPARAÇÃO DO CONTEÚDO ---
         contexto = ""
@@ -93,7 +102,7 @@ class NewsSummarizer:
                     temperature=0.3
                 )
                 return completion.choices[0].message.content
-            
+
             return self._simple_format(articles, include_intro, include_outro, lista_fontes_str)
 
         except Exception as e:
