@@ -2,6 +2,7 @@ import logging
 import os
 import httpx
 import asyncio
+import time
 from typing import List, Dict, Optional
 from urllib.parse import quote
 
@@ -113,6 +114,7 @@ class NewsCollector:
             # Fallback
             if not articles and category_name != 'geral':
                 logger.warning(f"Busca estrita vazia. Tentando fallback simples: '{category_name}'")
+                time.sleep(1.5)
                 params['q'] = category_name
                 retry = await self.client.get(self.base_url, params=params)
                 if retry.status_code == 200:
