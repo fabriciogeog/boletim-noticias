@@ -166,6 +166,56 @@ async def verificar_api() -> dict:
         return {"status": "erro", "erro": str(e)}
 
 
+
+# ================================================================
+# RESOURCES
+# ================================================================
+
+@mcp.resource("categorias://disponiveis")
+def categorias_disponiveis() -> str:
+    """Lista as categorias de notícias disponíveis no GNews.
+    A IA lê isso para sugerir opções ao usuário quando ele
+    não especificar uma categoria."""
+    return """
+Categorias disponíveis no sistema de boletins (GNews):
+
+- geral      : notícias gerais do dia
+- esportes   : futebol, olimpíadas, esportes em geral
+- tecnologia : inovação, startups, IA, gadgets
+- politica   : governo, eleições, legislativo
+- economia   : mercado, finanças, negócios
+- saude      : medicina, bem-estar, ciência
+"""
+
+
+# ================================================================
+# PROMPTS
+# ================================================================
+
+from fastmcp.prompts import Message
+
+@mcp.prompt()
+def gerar_boletim_guiado(
+    categoria: str = "geral",
+    num_noticias: int = 5
+) -> list[Message]:
+    """Inicia o fluxo completo de geração de boletim com
+    verificação prévia da API e relatório final estruturado."""
+    return [
+        Message(
+            role="user",
+            content=f"""
+Execute o fluxo completo de geração de boletim:
+1. Verifique se a API está online com verificar_api()
+2. Gere o boletim: categoria={categoria}, {num_noticias} notícias
+3. Confirme o arquivo de áudio gerado
+4. Informe o id do boletim e o nome do arquivo para referência futura
+"""
+        )
+    ]
+
+
+
 if __name__ == "__main__":
     transport = os.getenv("TRANSPORT", "stdio")
     if transport == "sse":

@@ -67,7 +67,7 @@ class BoletimRequest(BaseModel):
     include_outro: bool = True
 
     summary_mode: str = os.getenv("AI_SUMMARY_MODE", "none")
-    tts_engine: str = os.getenv("TTS_ENGINE", "gtts")
+    tts_engine: str = "gtts"
     tts_voice_id: str = "21m00Tcm4TlvDq8ikWAM"
     tld: Optional[str] = "com.br"
 
