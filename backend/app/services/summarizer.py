@@ -112,7 +112,7 @@ class NewsSummarizer:
 
     def _simple_format(self, articles, intro, outro, fontes_str):
         """Fallback formatado para quando a IA falha"""
-        texto = "Boletim de notícias (Modo de Segurança).\n\n" if intro else ""
+        texto = "Boletim de notícias.\n\n" if intro else ""
         for art in articles:
             if isinstance(art, dict):
                 texto += f"{art.get('title', 'Notícia')}. {art.get('description', '')}\n\n"
