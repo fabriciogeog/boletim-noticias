@@ -1,4 +1,3 @@
-
 // ========================================
 // NOVOS ELEMENTOS
 // ========================================
@@ -640,4 +639,321 @@ function resetInterface() {
 
     // Joga o foco para o topo para acessibilidade (NVDA)
     document.querySelector('h1').focus();
+}
+
+// ========================================
+// INTERFACE DE COMANDOS
+// Adicionar ao final do app.js existente
+// ========================================
+
+// Categorias válidas do sistema
+const CATEGORIAS_VALIDAS = [
+    'geral', 'politica', 'economia', 'tecnologia',
+    'esportes', 'entretenimento', 'saude', 'ciencia', 'mundo'
+];
+
+// Elementos do componente
+const cmdInput    = document.getElementById('comandoInput');
+const cmdBtn      = document.getElementById('comandoBtn');
+const cmdFeedback = document.getElementById('comandoFeedback');
+const cmdAjuda    = document.getElementById('comandoAjuda');
+const cmdHistorico = document.getElementById('historicoLista');
+
+// ----------------------------------------
+// FEEDBACK VISUAL E DE ACESSIBILIDADE
+// ----------------------------------------
+function cmdMostrarFeedback(msg, tipo = 'ok') {
+    // tipo: 'ok' | 'erro' | 'info'
+    cmdFeedback.textContent = msg;
+    cmdFeedback.className = `comando-feedback ${tipo}`;
+    cmdFeedback.style.display = 'block';
+
+    // Esconde automaticamente após 5s (exceto erros)
+    if (tipo !== 'erro') {
+        setTimeout(() => {
+            cmdFeedback.style.display = 'none';
+        }, 5000);
+    }
+}
+
+function cmdSetLoading(ativo) {
+    cmdBtn.disabled = ativo;
+    cmdInput.disabled = ativo;
+    cmdBtn.textContent = ativo ? '⏳' : '▶ Executar';
+}
+
+// ----------------------------------------
+// INTERPRETADOR DE COMANDOS
+// ----------------------------------------
+async function interpretarComando(raw) {
+    const texto = raw.trim().toLowerCase();
+    if (!texto) return;
+
+    // Esconde painéis auxiliares
+    cmdAjuda.classList.remove('visivel');
+    cmdHistorico.classList.remove('visivel');
+    cmdFeedback.style.display = 'none';
+
+    const partes = texto.split(/\s+/);
+    const acao = partes[0];
+
+    // ---- AJUDA ----
+    if (acao === 'ajuda' || acao === 'help') {
+        cmdAjuda.classList.add('visivel');
+        cmdAjuda.focus();
+        return;
+    }
+
+    // ---- LIMPAR ----
+    if (acao === 'limpar' || acao === 'clear') {
+        resetInterface();
+        cmdMostrarFeedback('✓ Tela limpa.', 'ok');
+        return;
+    }
+
+    // ---- STATUS ----
+    if (acao === 'status') {
+        cmdSetLoading(true);
+        try {
+            const r = await fetch(`${API_BASE_URL}/health`);
+            if (r.ok) {
+                const d = await r.json();
+                cmdMostrarFeedback(`✓ Sistema online · ${d.timestamp || ''}`, 'ok');
+            } else {
+                cmdMostrarFeedback('✗ API não respondeu corretamente.', 'erro');
+            }
+        } catch {
+            cmdMostrarFeedback('✗ Sem conexão com o servidor. Verifique o Docker.', 'erro');
+        } finally {
+            cmdSetLoading(false);
+        }
+        return;
+    }
+
+    // ---- HISTORICO ----
+    if (acao === 'historico' || acao === 'histórico' || acao === 'hist') {
+        cmdSetLoading(true);
+        try {
+            const r = await fetch(`${API_BASE_URL}/api/historico`);
+            const lista = await r.json();
+
+            if (!lista.length) {
+                cmdMostrarFeedback('ℹ Nenhum boletim encontrado no histórico.', 'info');
+                cmdSetLoading(false);
+                return;
+            }
+
+            // Monta a lista visual
+            cmdHistorico.innerHTML = lista.slice(0, 20).map(b => {
+                const data = b.timestamp
+                    ? new Date(b.timestamp).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+                    : '';
+                const preview = (b.summary_text || '').substring(0, 60) + '...';
+                return `
+                    <div class="historico-item">
+                        <span class="historico-id" aria-label="ID ${b.id}">#${b.id}</span>
+                        <span class="historico-info" title="${b.summary_text || ''}">${data} · ${b.categories || ''} · ${preview}</span>
+                        <button class="historico-btn-apagar"
+                            aria-label="Apagar boletim ${b.id}"
+                            onclick="cmdApagarBoletim(${b.id})">
+                            🗑 Apagar
+                        </button>
+                    </div>`;
+            }).join('');
+
+            cmdHistorico.classList.add('visivel');
+            cmdMostrarFeedback(`✓ ${lista.length} boletim(ns) encontrado(s).`, 'ok');
+
+        } catch {
+            cmdMostrarFeedback('✗ Erro ao buscar histórico.', 'erro');
+        } finally {
+            cmdSetLoading(false);
+        }
+        return;
+    }
+
+    // ---- APAGAR [id] ----
+    if (acao === 'apagar' || acao === 'deletar' || acao === 'remover') {
+        const id = parseInt(partes[1]);
+        if (isNaN(id)) {
+            cmdMostrarFeedback('✗ Informe o id. Ex: apagar 154', 'erro');
+            return;
+        }
+        if (!confirm(`Confirma a exclusão do boletim #${id}?`)) return;
+
+        await cmdApagarBoletim(id);
+        return;
+    }
+
+    // ---- AUDIO [texto] ----
+    if (acao === 'audio' || acao === 'áudio' || acao === 'narrar') {
+        const textoCrudo = partes.slice(1).join(' ').trim();
+        if (!textoCrudo) {
+            cmdMostrarFeedback('✗ Informe o texto. Ex: audio Bom dia ouvintes', 'erro');
+            return;
+        }
+
+        cmdSetLoading(true);
+        cmdMostrarFeedback('⏳ Gerando áudio...', 'info');
+
+        try {
+            const r = await fetch(`${API_BASE_URL}/api/generate-audio`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: textoCrudo,
+                    tts_engine: appState.config.tts_engine || 'gtts',
+                    tts_voice_id: '21m00Tcm4TlvDq8ikWAM'
+                })
+            });
+
+            if (!r.ok) throw new Error('Falha na API');
+            const d = await r.json();
+
+            displayBoletim({ summary_text: textoCrudo, audio_filename: d.audio_filename });
+            cmdMostrarFeedback(`✓ Áudio gerado: ${d.audio_filename}`, 'ok');
+
+        } catch {
+            cmdMostrarFeedback('✗ Erro ao gerar áudio.', 'erro');
+        } finally {
+            cmdSetLoading(false);
+        }
+        return;
+    }
+
+    // ---- GERAR [categorias...] [n] ----
+    if (acao === 'gerar' || acao === 'gera') {
+        // Extrai partes: categorias e número opcional
+        const resto = partes.slice(1);
+        let categorias = [];
+        let quantidade = 5; // padrão
+
+        resto.forEach(p => {
+            const n = parseInt(p);
+            if (!isNaN(n) && n > 0 && n <= 20) {
+                quantidade = n;
+            } else if (CATEGORIAS_VALIDAS.includes(p)) {
+                categorias.push(p);
+            }
+        });
+
+        if (categorias.length === 0) categorias = ['geral'];
+
+        const total = quantidade * categorias.length;
+
+        cmdSetLoading(true);
+        cmdMostrarFeedback(`⏳ Gerando boletim (${categorias.join(', ')}, ${quantidade} notícias)...`, 'info');
+
+        // Mostra loading overlay como o botão principal
+        elements.loadingOverlay.removeAttribute('hidden');
+        elements.generateBtn.disabled = true;
+
+        try {
+            const r = await fetch(`${API_BASE_URL}/api/generate-boletim`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    categories: categorias,
+                    num_articles: total,
+                    style: appState.config.style || 'jornalistico',
+                    include_intro: true,
+                    include_outro: true,
+                    summary_mode: appState.config.ai_summary_mode || 'groq',
+                    tts_engine: appState.config.tts_engine || 'gtts'
+                })
+            });
+
+            if (!r.ok) {
+                const err = await r.json();
+                throw new Error(err.detail || `HTTP ${r.status}`);
+            }
+
+            const d = await r.json();
+            appState.currentBoletim = d;
+            displayBoletim(d);
+            cmdMostrarFeedback(`✓ Boletim #${d.id} gerado · ${categorias.join(', ')} · ${quantidade} notícias`, 'ok');
+
+        } catch (e) {
+            cmdMostrarFeedback(`✗ Erro: ${e.message}`, 'erro');
+        } finally {
+            cmdSetLoading(false);
+            elements.loadingOverlay.setAttribute('hidden', '');
+            elements.generateBtn.disabled = false;
+        }
+        return;
+    }
+
+    // ---- CATEGORIAS ----
+    if (acao === 'categorias') {
+        cmdMostrarFeedback(
+            '📂 Categorias disponíveis: geral · politica · economia · tecnologia · ' +
+            'esportes · entretenimento · saude · ciencia · mundo',
+            'info'
+        );
+        return;
+    }
+
+    // ---- COMANDO DESCONHECIDO ----
+    cmdMostrarFeedback(`✗ Comando "${acao}" não reconhecido. Digite ajuda para ver os comandos.`, 'erro');
+}
+
+// ----------------------------------------
+// APAGAR BOLETIM (usado pelo botão do histórico e pelo comando)
+// ----------------------------------------
+async function cmdApagarBoletim(id) {
+    cmdSetLoading(true);
+    try {
+        const r = await fetch(`${API_BASE_URL}/api/historico/${id}`, { method: 'DELETE' });
+        if (r.ok) {
+            cmdMostrarFeedback(`✓ Boletim #${id} removido.`, 'ok');
+            // Atualiza o histórico se estiver visível
+            if (cmdHistorico.classList.contains('visivel')) {
+                await interpretarComando('historico');
+            }
+        } else {
+            cmdMostrarFeedback(`✗ Boletim #${id} não encontrado.`, 'erro');
+        }
+    } catch {
+        cmdMostrarFeedback('✗ Erro ao apagar boletim.', 'erro');
+    } finally {
+        cmdSetLoading(false);
+    }
+}
+
+// ----------------------------------------
+// EVENT LISTENERS DO COMPONENTE
+// ----------------------------------------
+if (cmdInput && cmdBtn) {
+
+    // Enter no campo executa o comando
+    cmdInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            interpretarComando(cmdInput.value);
+            cmdInput.value = '';
+        }
+        // Esc fecha os painéis auxiliares
+        if (e.key === 'Escape') {
+            cmdAjuda.classList.remove('visivel');
+            cmdHistorico.classList.remove('visivel');
+            cmdFeedback.style.display = 'none';
+        }
+    });
+
+    // Botão executar
+    cmdBtn.addEventListener('click', () => {
+        interpretarComando(cmdInput.value);
+        cmdInput.value = '';
+        cmdInput.focus();
+    });
+
+    // Sugestão ao digitar "aj" → mostra ajuda preemptivamente
+    cmdInput.addEventListener('input', () => {
+        const v = cmdInput.value.trim().toLowerCase();
+        if (v === 'ajuda' || v === 'aj' || v === 'help') {
+            cmdAjuda.classList.add('visivel');
+        } else {
+            cmdAjuda.classList.remove('visivel');
+        }
+    });
 }

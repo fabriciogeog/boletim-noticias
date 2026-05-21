@@ -711,3 +711,249 @@ body::after {
     border-color: #ff3b3b;
     color: #ff3b3b;
 }
+
+/* ========================================
+   INTERFACE DE COMANDOS
+   Adicionar ao final do styles.css existente
+   ======================================== */
+
+.comando-section {
+    margin-bottom: 2rem;
+    animation: fadeIn 0.4s;
+}
+
+.comando-section h3 {
+    color: var(--primary);
+    margin-bottom: 0.8rem;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.comando-wrapper {
+    display: flex;
+    gap: 0.8rem;
+    align-items: stretch;
+}
+
+.comando-input {
+    flex: 1;
+    background: rgba(0, 217, 255, 0.05);
+    border: 2px solid rgba(0, 217, 255, 0.3);
+    border-radius: 10px;
+    padding: 0.9rem 1.2rem;
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    transition: all 0.3s;
+    outline: none;
+}
+
+.comando-input::placeholder {
+    color: var(--text-dim);
+    opacity: 0.6;
+}
+
+.comando-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 15px var(--primary-glow);
+    background: rgba(0, 217, 255, 0.08);
+}
+
+.comando-btn {
+    background: var(--primary);
+    border: none;
+    color: var(--dark);
+    padding: 0.9rem 1.5rem;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 0 15px var(--primary-glow);
+    white-space: nowrap;
+}
+
+.comando-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px var(--primary);
+}
+
+.comando-btn:active {
+    transform: scale(0.97);
+}
+
+.comando-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Feedback de resposta */
+.comando-feedback {
+    margin-top: 0.8rem;
+    padding: 0.7rem 1rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-family: 'Courier New', monospace;
+    display: none;
+    animation: fadeIn 0.3s;
+}
+
+.comando-feedback.ok {
+    display: block;
+    background: rgba(0, 255, 136, 0.08);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    color: var(--success);
+}
+
+.comando-feedback.erro {
+    display: block;
+    background: rgba(255, 51, 102, 0.08);
+    border: 1px solid rgba(255, 51, 102, 0.3);
+    color: var(--danger);
+}
+
+.comando-feedback.info {
+    display: block;
+    background: rgba(0, 217, 255, 0.08);
+    border: 1px solid rgba(0, 217, 255, 0.3);
+    color: var(--primary);
+}
+
+/* Ajuda inline */
+.comando-ajuda {
+    margin-top: 0.6rem;
+    display: none;
+    background: rgba(10, 14, 39, 0.95);
+    border: 1px solid rgba(0, 217, 255, 0.2);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    animation: fadeIn 0.3s;
+}
+
+.comando-ajuda.visivel {
+    display: block;
+}
+
+.comando-ajuda table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.comando-ajuda td {
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    vertical-align: top;
+}
+
+.comando-ajuda td:first-child {
+    font-family: 'Courier New', monospace;
+    color: var(--primary);
+    white-space: nowrap;
+    padding-right: 1.2rem;
+    min-width: 180px;
+}
+
+.comando-ajuda td:last-child {
+    color: var(--text-dim);
+}
+
+.comando-ajuda tr:last-child td {
+    border-bottom: none;
+}
+
+/* Histórico inline */
+.historico-lista {
+    margin-top: 0.8rem;
+    display: none;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 217, 255, 0.2);
+    border-radius: 10px;
+    animation: fadeIn 0.3s;
+}
+
+.historico-lista.visivel {
+    display: block;
+}
+
+.historico-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 0.9rem;
+    gap: 1rem;
+    transition: background 0.2s;
+}
+
+.historico-item:hover {
+    background: rgba(0, 217, 255, 0.05);
+}
+
+.historico-item:last-child {
+    border-bottom: none;
+}
+
+.historico-id {
+    font-family: 'Courier New', monospace;
+    color: var(--primary);
+    font-weight: 700;
+    min-width: 40px;
+}
+
+.historico-info {
+    flex: 1;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.historico-btn-apagar {
+    background: transparent;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.historico-btn-apagar:hover {
+    background: var(--danger);
+    color: white;
+}
+
+/* Scrollbar do histórico */
+.historico-lista::-webkit-scrollbar {
+    width: 6px;
+}
+.historico-lista::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.02);
+}
+.historico-lista::-webkit-scrollbar-thumb {
+    background: rgba(0, 217, 255, 0.3);
+    border-radius: 3px;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .comando-wrapper {
+        flex-direction: column;
+    }
+    .comando-btn {
+        width: 100%;
+        padding: 1rem;
+    }
+    .comando-ajuda td:first-child {
+        min-width: 140px;
+    }
+}

@@ -34,6 +34,10 @@ async def _delete(endpoint: str) -> dict:
         return response.json()
 
 
+# ================================================================
+# TOOLS
+# ================================================================
+
 @mcp.tool()
 async def gerar_boletim(
     categorias: list[str] = ["geral"],
@@ -166,6 +170,31 @@ async def verificar_api() -> dict:
         return {"status": "erro", "erro": str(e)}
 
 
+@mcp.tool()
+async def confirmar_audio(filename: str) -> dict:
+    """Confirma se um arquivo de áudio foi gerado e está disponível.
+    Use após gerar um boletim para validar que o áudio existe."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.head(
+                f"{API_BASE}/audio/{filename}"
+            )
+            if response.status_code == 200:
+                tamanho = response.headers.get("content-length", "desconhecido")
+                return {
+                    "existe": True,
+                    "filename": filename,
+                    "tamanho_bytes": tamanho,
+                    "url": f"{API_BASE}/audio/{filename}",
+                    "status": "áudio disponível"
+                }
+            return {
+                "existe": False,
+                "erro": f"Arquivo não encontrado (status {response.status_code})"
+            }
+    except Exception as e:
+        return {"existe": False, "erro": str(e)}
+
 
 # ================================================================
 # RESOURCES
@@ -188,6 +217,22 @@ Categorias disponíveis no sistema de boletins (GNews):
 """
 
 
+# Resource dinâmico — texto completo de um boletim
+@mcp.resource("boletim://{id}/texto")
+async def texto_boletim(id: int) -> str:
+    """Retorna o texto completo de um boletim pelo id.
+    Use quando o usuário quiser reler, analisar ou
+    reprocessar o conteúdo de um boletim anterior."""
+    try:
+        boletins = await _get("/api/historico")
+        boletim = next((b for b in boletins if b["id"] == id), None)
+        if not boletim:
+            return f"Boletim id={id} não encontrado no histórico."
+        return boletim.get("summary_text", "Texto não disponível.")
+    except Exception as e:
+        return f"Erro ao buscar boletim: {str(e)}"
+
+
 # ================================================================
 # PROMPTS
 # ================================================================
@@ -208,13 +253,62 @@ def gerar_boletim_guiado(
 Execute o fluxo completo de geração de boletim:
 1. Verifique se a API está online com verificar_api()
 2. Gere o boletim: categoria={categoria}, {num_noticias} notícias
-3. Confirme o arquivo de áudio gerado
-4. Informe o id do boletim e o nome do arquivo para referência futura
+3. Confirme o áudio gerado usando confirmar_audio() com o filename retornado
+4. Informe o id do boletim e o status do áudio
 """
         )
     ]
 
 
+# Prompt — modo especializado para o locutor
+@mcp.prompt()
+def modo_locutor() -> list[Message]:
+    """Configura o assistente especificamente para uso
+    pelo locutor cego. Define o contexto e as capacidades
+    disponíveis de forma clara e acessível."""
+    return [
+        Message(
+            role="user",
+            content="Preciso que você atue como assistente do sistema de boletins."
+        ),
+        Message(
+            role="assistant",
+            content="""Pronto. Estou configurado para o sistema de boletins de notícias.
+
+Posso ajudar com:
+- Verificar se o sistema está online
+- Gerar boletins por categoria e quantidade
+- Regenerar áudios com voz diferente
+- Consultar e gerenciar o histórico
+- Confirmar arquivos de áudio gerados
+
+Basta me dizer o que precisa em linguagem natural."""
+        )
+    ]
+
+
+# Prompt — análise de boletim existente
+@mcp.prompt()
+def analisar_boletim(id: int) -> list[Message]:
+    """Instrui a IA a ler e analisar o conteúdo de um
+    boletim específico do histórico."""
+    return [
+        Message(
+            role="user",
+            content=f"""
+Leia o conteúdo do boletim id={id} usando o resource boletim://{id}/texto e me forneça:
+
+1. Resumo em 2 frases
+2. Principais temas abordados
+3. Estimativa de duração de leitura em voz alta (ritmo: 130 palavras por minuto)
+"""
+        )
+    ]
+
+
+# ================================================================
+# APLICAÇÃO PRINCIPAL
+# ================================================================
 
 if __name__ == "__main__":
     transport = os.getenv("TRANSPORT", "stdio")
