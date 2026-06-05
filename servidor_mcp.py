@@ -46,12 +46,19 @@ async def gerar_boletim(
     motor_tts: str = "gtts",
     modo_resumo: str = "none"
 ) -> dict:
-    """Gera um boletim de notícias completo com áudio.
-    Use quando o usuário pedir para gerar, criar ou produzir um boletim.
-    categorias: lista de temas como 'geral', 'esportes', 'tecnologia', 'politica'.
-    motor_tts: 'gtts' para voz Google (gratuito) ou 'elevenlabs' para voz premium.
-    modo_resumo: 'none' para texto bruto, 'groq' para sumarização via IA.
-    Retorna o id do boletim, o texto e o nome do arquivo de áudio gerado."""
+    """Gera um boletim de notícias completo com áudio MP3.
+    Use esta tool quando o usuário disser frases como:
+    'gera um boletim', 'cria um boletim', 'quero ouvir notícias',
+    'faz um boletim de esportes', 'gera 5 notícias de tecnologia'.
+    Parâmetro categorias: lista com um ou mais temas.
+    Valores aceitos para categorias: 'geral', 'esportes', 'tecnologia',
+    'politica', 'economia', 'saude', 'ciencia', 'mundo', 'entretenimento'.
+    Parâmetro num_artigos: quantidade de notícias (padrão 5, máximo 20).
+    Parâmetro motor_tts: 'gtts' para voz Google gratuita ou
+    'elevenlabs' para voz premium.
+    Parâmetro modo_resumo: 'none' para texto direto, 'groq' para resumo por IA.
+    Após gerar, sempre chame confirmar_audio com o filename retornado.
+    Retorna id, nome do arquivo de áudio, categorias e prévia do texto."""
     try:
         resultado = await _post("/api/generate-boletim", {
             "categories": categorias,
@@ -82,10 +89,15 @@ async def regenerar_audio(
     texto: str,
     motor_tts: str = "gtts"
 ) -> dict:
-    """Gera um novo arquivo de áudio a partir de um texto fornecido.
-    Use quando o usuário quiser ouvir um texto específico, renarrar
-    um boletim com voz diferente, ou converter texto em fala.
-    motor_tts: 'gtts' para voz Google ou 'elevenlabs' para voz premium."""
+    """Converte um texto qualquer em arquivo de áudio MP3.
+    Use esta tool quando o usuário disser frases como:
+    'lê esse texto', 'narra esse conteúdo', 'converte em áudio',
+    'gera áudio desse texto', 'quero ouvir esse texto',
+    'regenera o áudio do boletim X com voz diferente'.
+    Parâmetro texto: o conteúdo a ser narrado (obrigatório, máximo 5000 caracteres).
+    Parâmetro motor_tts: 'gtts' para voz Google gratuita ou
+    'elevenlabs' para voz premium.
+    Retorna o nome do arquivo de áudio gerado e a URL de acesso."""
     if not texto.strip():
         return {"erro": "O texto não pode ser vazio."}
     try:
@@ -107,33 +119,45 @@ async def regenerar_audio(
 
 
 @mcp.tool()
-async def listar_historico() -> list[dict]:
-    """Lista todos os boletins gerados anteriormente com id, data e categorias.
-    Use quando o usuário perguntar sobre boletins anteriores, quiser ver
-    o histórico ou precisar do id de um boletim para outra operação."""
+async def listar_historico() -> str:
+    """Lista todos os boletins já gerados e salvos no sistema.
+    Use esta tool quando o usuário fizer perguntas como:
+    'quantos boletins foram gerados', 'quais boletins existem',
+    'mostra o histórico', 'que boletins temos', 'boletins anteriores',
+    'o que já foi gerado', 'lista os boletins', 'histórico de boletins'.
+    Não use esta tool para gerar novos boletins.
+    Retorna quantidade total e lista resumida de cada boletim."""
     try:
         boletins = await _get("/api/historico")
-        return [
-            {
-                "id": b.get("id"),
-                "data": b.get("timestamp"),
-                "categorias": b.get("categories"),
-                "audio": b.get("audio_filename"),
-                "preview": b.get("summary_text", "")[:150] + "..."
-            }
-            for b in boletins
-        ]
+        if not boletins:
+            return "Nenhum boletim gerado ainda."
+
+        linhas = [f"Total: {len(boletins)} boletim(ns) gerado(s).\n"]
+        for b in boletins[:20]:  # limita a 20 para não sobrecarregar
+            data = b.get("timestamp", "")[:16] if b.get("timestamp") else "?"
+            linhas.append(
+                f"ID {b.get('id')} | {data} | "
+                f"{b.get('categories', '?')} | "
+                f"{b.get('audio_filename', 'sem áudio')}"
+            )
+        return "\n".join(linhas)
+
     except httpx.ConnectError:
-        return [{"erro": "Não foi possível conectar à API. Verifique se o Docker está rodando."}]
+        return "Erro: API não está respondendo. Verifique se o Docker está rodando."
     except Exception as e:
-        return [{"erro": str(e)}]
+        return f"Erro: {str(e)}"
 
 
 @mcp.tool()
 async def deletar_boletim(id: int) -> dict:
-    """Remove um boletim do histórico e exclui o arquivo de áudio associado.
-    Use quando o usuário pedir para apagar, remover ou excluir um boletim.
-    Requer o id do boletim — use listar_historico() primeiro se necessário."""
+    """Remove permanentemente um boletim do histórico e apaga o arquivo de áudio.
+    Use esta tool quando o usuário disser frases como:
+    'apaga o boletim', 'remove o boletim', 'deleta o boletim',
+    'exclui o boletim de id X'.
+    Parâmetro id: número inteiro identificador do boletim (obrigatório).
+    Se o usuário não informar o id, chame listar_historico primeiro
+    para mostrar os boletins disponíveis e seus ids.
+    Atenção: esta operação é irreversível — o áudio também é excluído do disco."""
     try:
         resultado = await _delete(f"/api/historico/{id}")
         return resultado
@@ -149,9 +173,13 @@ async def deletar_boletim(id: int) -> dict:
 
 @mcp.tool()
 async def verificar_api() -> dict:
-    """Verifica se a API do Boletim está online e saudável.
-    Use quando o usuário perguntar se o sistema está funcionando,
-    antes de gerar boletins, ou para diagnóstico de problemas."""
+    """Verifica se o sistema de Boletim de Notícias está online e operacional.
+    Use esta tool quando o usuário disser frases como:
+    'o sistema está funcionando', 'verifica o sistema', 'está tudo ok',
+    'sistema online', 'checa a API', 'diagnóstico'.
+    Também use antes de gerar boletins se houver dúvida sobre disponibilidade.
+    Retorna status, timestamp, motor de voz configurado, motor de resumo
+    e quais chaves de API estão configuradas no sistema."""
     try:
         resultado = await _get("/health")
         config = await _get("/api/config")
@@ -172,8 +200,12 @@ async def verificar_api() -> dict:
 
 @mcp.tool()
 async def confirmar_audio(filename: str) -> dict:
-    """Confirma se um arquivo de áudio foi gerado e está disponível.
-    Use após gerar um boletim para validar que o áudio existe."""
+    """Confirma se um arquivo de áudio MP3 foi gerado e está disponível no servidor.
+    Use esta tool sempre após chamar gerar_boletim ou regenerar_audio,
+    passando o filename retornado por essas tools.
+    Parâmetro filename: nome do arquivo MP3 (exemplo: boletim_20260524_123456.mp3).
+    Retorna se o arquivo existe, seu tamanho em bytes e a URL de acesso.
+    Se o arquivo não existir, retorna erro descritivo."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.head(

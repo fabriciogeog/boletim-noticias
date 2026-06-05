@@ -84,84 +84,26 @@
             </div>
         </section>
 
-    <!-- ========================================
-     INTERFACE DE COMANDOS
-     Inserir no index.html ENTRE:
-     </section> (fim do player-section)
-     E:
-     <section class="categories"> (início das categorias)
-     ======================================== -->
-
-<section class="comando-section" aria-label="Interface de comandos de voz">
-    <h3>⌨️ COMANDOS <span style="color: var(--text-dim); font-size: 0.85rem; font-weight: 400;">— digite ou fale um comando</span></h3>
-
-    <div class="comando-wrapper">
-        <input
-            type="text"
-            id="comandoInput"
-            class="comando-input"
-            placeholder="Ex: gerar tecnologia 5 · historico · ajuda"
-            aria-label="Campo de comandos. Digite um comando e pressione Enter ou o botão Executar."
-            autocomplete="off"
-            autocorrect="off"
-            spellcheck="false"
-        />
-        <button id="comandoBtn" class="comando-btn" aria-label="Executar comando">
-            ▶ Executar
-        </button>
-    </div>
-
-    <!-- Feedback do comando -->
-    <div id="comandoFeedback" class="comando-feedback" role="status" aria-live="polite"></div>
-
-    <!-- Ajuda inline (visível ao digitar "ajuda") -->
-    <div id="comandoAjuda" class="comando-ajuda" role="region" aria-live="polite" aria-label="Lista de comandos disponíveis">
-        <table>
-            <tbody>
-                <tr>
-                    <td>gerar [categoria] [n]</td>
-                    <td>Gera boletim. Ex: <em>gerar tecnologia 5</em></td>
-                </tr>
-                <tr>
-                    <td>gerar [cat1] [cat2] [n]</td>
-                    <td>Múltiplas categorias. Ex: <em>gerar esportes politica 3</em></td>
-                </tr>
-                <tr>
-                    <td>historico</td>
-                    <td>Lista os últimos boletins gerados</td>
-                </tr>
-                <tr>
-                    <td>apagar [id]</td>
-                    <td>Remove boletim. Ex: <em>apagar 154</em></td>
-                </tr>
-                <tr>
-                    <td>audio [texto]</td>
-                    <td>Converte texto em fala. Ex: <em>audio Bom dia ouvintes</em></td>
-                </tr>
-                <tr>
-                    <td>status</td>
-                    <td>Verifica se o sistema está online</td>
-                </tr>
-                <tr>
-                    <td>limpar</td>
-                    <td>Limpa a tela</td>
-                </tr>
-                <tr>
-                    <td>categorias</td>
-                    <td>Lista todas as categorias disponíveis</td>
-                </tr>
-                <tr>
-                    <td>ajuda</td>
-                    <td>Exibe esta lista de comandos</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Histórico inline (visível ao digitar "historico") -->
-    <div id="historicoLista" class="historico-lista" role="region" aria-live="polite" aria-label="Histórico de boletins"></div>
-
-</section>
+    <!-- INTERFACE DE COMANDOS -->
+    <section class="comando-section" aria-label="Interface de comandos">
+        <h3>⌨️ COMANDOS <span style="color: var(--text-dim); font-size: 0.85rem; font-weight: 400;">— digite um comando e pressione Enter</span></h3>
+        <div class="comando-wrapper">
+            <input
+                type="text"
+                id="comandoInput"
+                class="comando-input"
+                placeholder="Ex: gerar tecnologia 5 · historico · ajuda"
+                aria-label="Campo de comandos. Digite um comando e pressione Enter ou o botão Executar."
+                autocomplete="off"
+                autocorrect="off"
+                spellcheck="false"
+            />
+            <button id="comandoBtn" class="comando-btn" aria-label="Executar comando">
+                ▶ Executar
+            </button>
+        </div>
+        <div id="comandoFeedback" class="comando-feedback" role="status" aria-live="polite" style="display:none;"></div>
+    </section>
 
         <!-- Categories -->
         <section class="categories">

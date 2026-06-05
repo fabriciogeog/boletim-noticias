@@ -1,0 +1,30 @@
+# Credenciais e configurações sensíveis
+.env
+.env.*
+*.key
+*.pem
+*.cert
+
+# Dados gerados pelo sistema
+/audio
+/audio/**
+/data
+/data/**
+/media
+/media/**
+/staticfiles
+/staticfiles/**
+
+# Dependências e cache
+/.venv
+__pycache__/
+*.pyc
+
+# Banco de dados local
+*.db
+*.sqlite3
+
+# Backups e arquivos temporários
+*.tar.gz
+*.zip
+*.bak

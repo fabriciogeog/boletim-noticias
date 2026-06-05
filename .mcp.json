@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "boletim-noticias": {
+      "command": "/home/fabricio/Projetos/Docker/boletim-noticias/.venv/bin/python",
+      "args": ["/home/fabricio/Projetos/Docker/boletim-noticias/servidor_mcp.py"]
+    }
+  }
+}
