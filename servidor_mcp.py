@@ -126,14 +126,13 @@ async def listar_historico() -> str:
     'mostra o histórico', 'que boletins temos', 'boletins anteriores',
     'o que já foi gerado', 'lista os boletins', 'histórico de boletins'.
     Não use esta tool para gerar novos boletins.
-    Retorna quantidade total e lista resumida de cada boletim."""
+    Retorna quantidade total e lista resumida com id, data, categoria e arquivo de áudio."""
     try:
         boletins = await _get("/api/historico")
         if not boletins:
             return "Nenhum boletim gerado ainda."
-
         linhas = [f"Total: {len(boletins)} boletim(ns) gerado(s).\n"]
-        for b in boletins[:20]:  # limita a 20 para não sobrecarregar
+        for b in boletins[:20]:
             data = b.get("timestamp", "")[:16] if b.get("timestamp") else "?"
             linhas.append(
                 f"ID {b.get('id')} | {data} | "
@@ -141,7 +140,6 @@ async def listar_historico() -> str:
                 f"{b.get('audio_filename', 'sem áudio')}"
             )
         return "\n".join(linhas)
-
     except httpx.ConnectError:
         return "Erro: API não está respondendo. Verifique se o Docker está rodando."
     except Exception as e:
@@ -226,6 +224,31 @@ async def confirmar_audio(filename: str) -> dict:
             }
     except Exception as e:
         return {"existe": False, "erro": str(e)}
+
+
+@mcp.tool()
+async def ler_boletim(id: int) -> str:
+    """Retorna o texto completo de um boletim pelo id.
+    Use esta tool quando o usuário disser frases como:
+    'lê o boletim X', 'mostra o texto do boletim X',
+    'quero ler o boletim de id X', 'qual o conteúdo do boletim X',
+    'mostra as notícias do boletim X'.
+    Parâmetro id: número inteiro do boletim (obrigatório).
+    Use listar_historico primeiro se o usuário não souber o id.
+    Retorna o texto completo das notícias do boletim."""
+    try:
+        boletins = await _get("/api/historico")
+        boletim = next((b for b in boletins if b["id"] == id), None)
+        if not boletim:
+            return f"Boletim id={id} não encontrado. Use listar_historico para ver os ids disponíveis."
+        texto = boletim.get("summary_text", "").strip()
+        if not texto:
+            return f"Boletim id={id} encontrado mas sem texto disponível."
+        return f"Boletim ID {id} | {boletim.get('categories', '?')} | {boletim.get('timestamp', '')[:16]}\n\n{texto}"
+    except httpx.ConnectError:
+        return "Erro: API não está respondendo. Verifique se o Docker está rodando."
+    except Exception as e:
+        return f"Erro ao buscar boletim: {str(e)}"
 
 
 # ================================================================
