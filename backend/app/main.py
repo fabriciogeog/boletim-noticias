@@ -277,6 +277,45 @@ async def get_historico():
         return []
 
 
+@app.delete("/api/historico/lote", response_model=dict)
+async def delete_boletins_em_lote(ate_id: int):
+    """
+    Exclui todos os boletins com ID <= ate_id, removendo também os arquivos de áudio.
+    Retorna a quantidade de registros excluídos.
+    """
+    try:
+        boletins = db_session.query(BoletimModel).filter(
+            BoletimModel.id <= ate_id
+        ).all()
+
+        if not boletins:
+            return {"success": True, "deletados": 0, "message": f"Nenhum boletim encontrado com ID <= {ate_id}."}
+
+        deletados = 0
+        erros_audio = []
+        for b in boletins:
+            if b.audio_filename:
+                try:
+                    fp = Path("/app/audio") / os.path.basename(b.audio_filename)
+                    if fp.exists():
+                        fp.unlink()
+                except Exception as e:
+                    erros_audio.append(b.audio_filename)
+            db_session.delete(b)
+            deletados += 1
+
+        db_session.commit()
+        msg = f"{deletados} boletim(ns) excluído(s) (ID <= {ate_id})."
+        if erros_audio:
+            msg += f" Áudios não removidos: {erros_audio}"
+        logger.info(msg)
+        return {"success": True, "deletados": deletados, "message": msg}
+    except Exception as e:
+        db_session.rollback()
+        logger.error(f"Erro ao excluir em lote: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.delete("/api/historico/{boletim_id}", response_model=dict)
 async def delete_boletim(boletim_id: int):
     """

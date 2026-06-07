@@ -170,6 +170,26 @@ async def deletar_boletim(id: int) -> dict:
 
 
 @mcp.tool()
+async def deletar_boletins_em_lote(ate_id: int) -> dict:
+    """Remove permanentemente todos os boletins com ID menor ou igual a ate_id.
+    Use esta tool quando o usuário disser frases como:
+    'apaga todos os boletins até o id X', 'exclui boletins com id menor que X',
+    'limpa o histórico até id X', 'remove todos abaixo de id X'.
+    Parâmetro ate_id: número inteiro — todos os boletins com ID <= ate_id serão excluídos.
+    Se o usuário não informar o id limite, chame listar_historico primeiro.
+    Atenção: esta operação é irreversível — os áudios também são excluídos do disco."""
+    try:
+        resultado = await _delete(f"/api/historico/lote?ate_id={ate_id}")
+        return resultado
+    except httpx.HTTPStatusError as e:
+        return {"erro": f"API retornou status {e.response.status_code}: {e.response.text}"}
+    except httpx.ConnectError:
+        return {"erro": "Não foi possível conectar à API. Verifique se o Docker está rodando."}
+    except Exception as e:
+        return {"erro": str(e)}
+
+
+@mcp.tool()
 async def verificar_api() -> dict:
     """Verifica se o sistema de Boletim de Notícias está online e operacional.
     Use esta tool quando o usuário disser frases como:
