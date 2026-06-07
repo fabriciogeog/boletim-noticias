@@ -167,7 +167,7 @@ class SessaoMCP:
                 "function": {
                     "name":        t.name,
                     "description": t.description or "",
-                    "parameters":  t.inputSchema or {"type": "object", "properties": {}}
+                    "parameters":  _relaxar_schema(t.inputSchema or {"type": "object", "properties": {}})
                 }
             }
             for t in self.tools
@@ -280,6 +280,43 @@ def _chamar_llm(historico: list) -> dict:
         return resp
 
 
+def _relaxar_schema(schema: dict) -> dict:
+    """Substitui type=integer por anyOf=[integer,string] no schema enviado ao Groq.
+    Evita que o Groq rejeite tool calls onde o modelo envia id como string."""
+    if not schema or "properties" not in schema:
+        return schema
+    new_props = {}
+    for key, prop in schema["properties"].items():
+        if prop.get("type") == "integer":
+            new_props[key] = {k: v for k, v in prop.items() if k != "type"}
+            new_props[key]["anyOf"] = [{"type": "integer"}, {"type": "string"}]
+        else:
+            new_props[key] = prop
+    return {**schema, "properties": new_props}
+
+
+def _coerce_args(tool_name: str, args: dict) -> dict:
+    """Converte tipos de argumentos conforme o schema da tool (corrige Groq enviando int como string)."""
+    tool = next((t for t in sessao.tools if t.name == tool_name), None)
+    if not tool or not tool.inputSchema:
+        return args
+    properties = tool.inputSchema.get("properties", {})
+    coerced = dict(args)
+    for key, value in coerced.items():
+        expected = properties.get(key, {}).get("type")
+        if expected == "integer" and isinstance(value, str):
+            try:
+                coerced[key] = int(value)
+            except (ValueError, TypeError):
+                pass
+        elif expected == "number" and isinstance(value, str):
+            try:
+                coerced[key] = float(value)
+            except (ValueError, TypeError):
+                pass
+    return coerced
+
+
 async def conversar(pergunta: str, historico_anterior: list = None) -> str:
     """
     Processa uma pergunta com histórico de conversa opcional.
@@ -311,7 +348,7 @@ async def conversar(pergunta: str, historico_anterior: list = None) -> str:
         if msg.get("tool_calls"):
             for tc in msg["tool_calls"]:
                 nome = tc["function"]["name"]
-                args = tc["function"]["arguments"]
+                args = _coerce_args(nome, tc["function"]["arguments"])
                 try:
                     resultado = await sessao.session.call_tool(nome, args)
                     conteudo  = resultado.content[0].text if resultado.content else "sem resultado"
