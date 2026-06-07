@@ -19,6 +19,7 @@ from database import db_session, init_db, Boletim as BoletimModel
 
 # --- Importação do Gerenciador de .env ---
 import env_manager
+from dotenv import load_dotenv
 
 # Configurar logging
 logging.basicConfig(
@@ -360,6 +361,9 @@ async def save_configuracoes(request: ConfigSaveRequest):
         if not success:
             raise HTTPException(
                 status_code=500, detail="Erro ao salvar o arquivo .env no servidor.")
+
+        # Recarrega o .env no os.environ para que os getenv() abaixo leiam os novos valores
+        load_dotenv(override=True)
 
         # Recarregar os serviços com as novas chaves/configurações
         news_collector.api_key = os.getenv("GNEWS_API_KEY")

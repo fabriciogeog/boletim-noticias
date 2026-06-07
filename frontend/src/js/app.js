@@ -100,8 +100,12 @@ function setupEventListeners() {
 // ── STATUS DO SISTEMA ─────────────────────────────
 async function verificarStatus() {
   try {
-    const r = await fetch(STATUS_URL, { signal: AbortSignal.timeout(5000) });
-    const d = await r.json();
+    const [rStatus, rConfig] = await Promise.all([
+      fetch(STATUS_URL, { signal: AbortSignal.timeout(5000) }),
+      fetch('/api/config', { signal: AbortSignal.timeout(5000) }).catch(() => null)
+    ]);
+    const d = await rStatus.json();
+    const c = rConfig?.ok ? await rConfig.json() : {};
     const online = d.api_boletim === 'online';
 
     elStatusDot.className   = 'status-dot ' + (online ? 'online' : 'offline');
@@ -110,11 +114,17 @@ async function verificarStatus() {
       : 'API offline';
 
     if (elInfoModelo) {
+      const ttsLabel     = { gtts: 'Google TTS', elevenlabs: 'ElevenLabs' }[c.TTS_ENGINE] || c.TTS_ENGINE || '—';
+      const resumoLabel  = { groq: 'Groq (Llama)', local: 'Ollama local', none: 'Sem resumo' }[c.AI_SUMMARY_MODE] || c.AI_SUMMARY_MODE || '—';
       elInfoModelo.innerHTML = `
-        <strong>Modelo: ${d.modelo || '—'}</strong>
-        Modo: ${d.llm_modo || 'ollama'}<br>
+        <strong>Modelo chat: ${d.modelo || '—'}</strong>
+        Modo LLM: ${d.llm_modo || '—'}<br>
         ${d.tools ? d.tools.length : 0} ferramentas disponíveis<br>
-        API Boletim: ${online ? '✓ online' : '✗ offline'}
+        API Boletim: ${online ? '✓ online' : '✗ offline'}<br>
+        <br>
+        <strong>Configuração do boletim:</strong><br>
+        Voz: ${ttsLabel}<br>
+        Resumo IA: ${resumoLabel}
       `;
     }
   } catch {
@@ -452,7 +462,7 @@ function limparConversa() {
 // ── CONFIGURAÇÕES ─────────────────────────────────
 async function carregarConfig() {
   try {
-    const r = await fetch(`${API_BASE}/api/config`);
+    const r = await fetch('/api/config');
     if (!r.ok) return;
     const c = await r.json();
     if (elTtsEngine   && c.TTS_ENGINE)      elTtsEngine.value   = c.TTS_ENGINE;
@@ -474,13 +484,19 @@ async function salvarConfig() {
       gnews_api_key:      elGnewsKey?.value    || null
     };
 
-    const r = await fetch(`${API_BASE}/api/config`, {
+    const r = await fetch('/api/config', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(payload)
     });
 
-    elBtnSalvar.textContent = r.ok ? '✓ Salvo!' : '✗ Erro';
+    if (r.ok) {
+      elBtnSalvar.textContent = '✓ Salvo!';
+      // Atualiza o painel de info e recarrega os selects para confirmar ao usuário
+      await Promise.all([verificarStatus(), carregarConfig()]);
+    } else {
+      elBtnSalvar.textContent = '✗ Erro';
+    }
     setTimeout(() => {
       elBtnSalvar.textContent = originalText;
       elBtnSalvar.disabled    = false;
