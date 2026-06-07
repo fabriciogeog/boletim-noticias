@@ -2,50 +2,53 @@ import logging
 import os
 import httpx
 import asyncio
-import time
 from typing import List, Dict, Optional
-from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 
 
 class NewsCollector:
     """
-    Coleta notícias usando a API GNews via endpoint de BUSCA (Search).
-    Estratégia Híbrida: Usa termos em PT e EN para maximizar a busca,
-    mas filtra resultados apenas em Português do Brasil.
+    Coleta notícias usando a API GNews via endpoint TOP-HEADLINES.
+    Retorna apenas notícias recentes (sem mistura com dados históricos).
+    Plano gratuito: atraso de 12h, sem limite de datas além de 30 dias.
     """
 
     def __init__(self):
-        self.api_key = os.getenv("GNEWS_API_KEY")
-        self.base_url = "https://gnews.io/api/v4/search"
+        self.api_key    = os.getenv("GNEWS_API_KEY")
+        self.url_top    = "https://gnews.io/api/v4/top-headlines"
+        self.url_search = "https://gnews.io/api/v4/search"   # fallback
 
         if not self.api_key:
             logger.error("ERRO: GNEWS_API_KEY não definida.")
 
-        # Mapeamento HÍBRIDO (Português + Inglês)
-        # O teste do usuário provou que termos como 'sport' trazem resultados melhores
-        # devido a nomes de times e URLs, mesmo em notícias brasileiras.
-        self.SEARCH_TERMS = {
-            "geral": "brasil OR breaking news OR manchetes",
+        # Mapeamento das categorias do sistema para as categorias do GNews top-headlines
+        # Documentação: https://gnews.io/docs/v4#top-headlines
+        self.GNEWS_CATEGORIES = {
+            "geral":          "general",
+            "mundo":          "world",
+            "politica":       "nation",
+            "economia":       "business",
+            "tecnologia":     "technology",
+            "entretenimento": "entertainment",
+            "esportes":       "sports",
+            "futebol":        "sports",
+            "saude":          "health",
+            "ciencia":        "science",
+        }
 
-            "politica": "política brasil OR congresso nacional OR governo federal OR planalto OR politics brazil",
-
-            "economia": "economia brasil OR mercado financeiro OR inflação OR business brazil OR economy",
-
-            "tecnologia": "tecnologia inovação OR inteligência artificial OR startups OR tech brazil OR technology",
-
-            # AQUI ESTÁ A MUDANÇA SOLICITADA:
-            # Adicionamos 'sport' e 'sports' para pegar tanto a categoria quanto nomes de times (Sport Recife, etc)
-            "esportes": "esportes brasil OR futebol OR campeonato OR sport brazil OR sports",
-
-            "entretenimento": "cinema brasil OR música brasil OR cultura pop OR famosos OR entertainment",
-
-            # Aliases
-            "futebol": "futebol brasil OR soccer brazil",
-            "saude": "saúde pública brasil OR medicina OR health brazil",
-            "ciencia": "ciência pesquisa brasil OR science brazil",
-            "mundo": "notícias internacionais mundo OR world news"
+        # Termos de busca usados APENAS como fallback (search endpoint)
+        self.SEARCH_FALLBACK = {
+            "geral":          "brasil notícias",
+            "politica":       "política brasil",
+            "economia":       "economia brasil",
+            "tecnologia":     "tecnologia brasil",
+            "esportes":       "esportes brasil",
+            "futebol":        "futebol brasil",
+            "entretenimento": "entretenimento brasil",
+            "saude":          "saúde brasil",
+            "ciencia":        "ciência brasil",
+            "mundo":          "world news",
         }
 
         self.client = httpx.AsyncClient()
@@ -56,87 +59,90 @@ class NewsCollector:
         limit: int = 10,
         sources: Optional[List[str]] = None
     ) -> List[Dict]:
-        """
-        Coleta notícias buscando ativamente por palavras-chave.
-        """
         if not self.api_key or not categories:
             return []
 
-        # Calcula quantos artigos buscar por categoria
         articles_per_category = max(1, int(limit / len(categories)))
+        logger.info(f"Coletando top-headlines para: {categories}")
 
-        logger.info(f"🔎 Iniciando busca HÍBRIDA para: {categories}")
-
-        tasks = []
-        for category in categories:
-            clean_cat = category.lower().strip()
-            tasks.append(self._search_category(
-                clean_cat, articles_per_category))
-
+        tasks = [
+            self._fetch_category(cat.lower().strip(), articles_per_category)
+            for cat in categories
+        ]
         results = await asyncio.gather(*tasks)
 
         all_articles = []
-        seen_titles = set()
+        seen_titles  = set()
 
         for category_articles in results:
             for article in category_articles:
-                if article['title'] not in seen_titles:
+                if article["title"] not in seen_titles:
                     all_articles.append(article)
-                    seen_titles.add(article['title'])
+                    seen_titles.add(article["title"])
 
         return all_articles[:limit]
 
-    async def _search_category(self, category_name: str, max_articles: int) -> List[Dict]:
-        """ Realiza a busca específica """
+    async def _fetch_category(self, category: str, max_articles: int) -> List[Dict]:
+        """Busca notícias pelo endpoint top-headlines; usa search como fallback."""
 
-        # Pega a query híbrida
-        search_query = self.SEARCH_TERMS.get(category_name, category_name)
+        gnews_cat = self.GNEWS_CATEGORIES.get(category, "general")
 
         params = {
-            "apikey": self.api_key,
-            "q": search_query,
-            "lang": "pt",       # Mantemos PT para garantir que o texto venha em português
-            "country": "br",    # Mantemos BR
-            "max": max_articles,
-            "sortby": "publishedAt"
+            "apikey":   self.api_key,
+            "category": gnews_cat,
+            "lang":     "pt",
+            "country":  "br",
+            "max":      max_articles,
         }
 
         try:
-            logger.info(f"Buscando GNews por: '{search_query}'")
+            logger.info(f"top-headlines: categoria='{gnews_cat}' (solicitado: '{category}')")
+            r = await self.client.get(self.url_top, params=params, timeout=15.0)
+            r.raise_for_status()
+            articles = r.json().get("articles", [])
 
-            response = await self.client.get(
-                self.base_url, params=params, timeout=15.0
-            )
-            response.raise_for_status()
-            data = response.json()
-            articles = data.get("articles", [])
+            if articles:
+                return self._parse(articles, category)
 
-            # Fallback
-            if not articles and category_name != 'geral':
-                logger.warning(f"Busca estrita vazia. Tentando fallback simples: '{category_name}'")
-                time.sleep(1.5)
-                params['q'] = category_name
-                retry = await self.client.get(self.base_url, params=params)
-                if retry.status_code == 200:
-                    articles = retry.json().get("articles", [])
-
-            return self._parse_json_response(articles, category_name)
+            # Fallback para search se top-headlines não retornar resultados
+            logger.warning(f"top-headlines vazio para '{gnews_cat}'. Tentando search...")
+            return await self._fallback_search(category, max_articles)
 
         except Exception as e:
-            logger.error(f"Erro na busca por '{category_name}': {e}")
+            logger.error(f"Erro em top-headlines para '{category}': {e}")
+            return await self._fallback_search(category, max_articles)
+
+    async def _fallback_search(self, category: str, max_articles: int) -> List[Dict]:
+        """Fallback: busca por termos quando top-headlines falha."""
+        query = self.SEARCH_FALLBACK.get(category, category)
+        params = {
+            "apikey":  self.api_key,
+            "q":       query,
+            "lang":    "pt",
+            "country": "br",
+            "max":     max_articles,
+            "sortby":  "publishedAt",
+        }
+        try:
+            logger.info(f"search fallback: query='{query}'")
+            r = await self.client.get(self.url_search, params=params, timeout=15.0)
+            r.raise_for_status()
+            articles = r.json().get("articles", [])
+            return self._parse(articles, category)
+        except Exception as e:
+            logger.error(f"Erro no fallback search para '{category}': {e}")
             return []
 
-    def _parse_json_response(self, articles: List[Dict], category: str) -> List[Dict]:
-        parsed_list = []
-        for article in articles:
-            if not article.get("title"):
+    def _parse(self, articles: List[Dict], category: str) -> List[Dict]:
+        result = []
+        for a in articles:
+            if not a.get("title"):
                 continue
-
-            parsed_list.append({
-                "title": article.get("title"),
-                "summary": article.get("description", ""),
-                "source": article.get("source", {}).get("name", "Fonte desconhecida"),
-                "url": article.get("url"),
-                "category": category
+            result.append({
+                "title":    a.get("title", ""),
+                "summary":  a.get("description", ""),
+                "source":   a.get("source", {}).get("name", "Fonte desconhecida"),
+                "url":      a.get("url", ""),
+                "category": category,
             })
-        return parsed_list
+        return result

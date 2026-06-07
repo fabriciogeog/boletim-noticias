@@ -1,885 +1,523 @@
-// ========================================
-// NOVOS ELEMENTOS
-// ========================================
+// ================================================
+// BOLETIM ON AIR — app.js
+// Interface unificada com Assistente IA
+// ================================================
 
-const newsEditor = document.getElementById('newsEditor');
-const editControls = document.getElementById('editControls');
-const btnEdit = document.getElementById('btnEdit');
-const saveCancelGroup = document.getElementById('saveCancelGroup');
-const btnSaveAudio = document.getElementById('btnSaveAudio');
-const btnCancelEdit = document.getElementById('btnCancelEdit');
-const readModeGroup = document.getElementById('readModeGroup');
-const btnCopy = document.getElementById('btnCopy');
-const btnSaveTextOnly = document.getElementById('btnSaveTextOnly');
-const resetBtn = document.getElementById('resetBtn');
-const newsText = document.getElementById('newsText');
-const playerSection = document.getElementById('playerSection');
-const audioPlayer = document.getElementById('audioPlayer');
-const placeholder = document.getElementById('placeholder');
-const durationDisplay = document.getElementById('duration');
-const currentTimeDisplay = document.getElementById('currentTime');
+'use strict';
 
-// ========================================
-// CONFIGURAÇÕES E ESTADO
-// ========================================
-// const API_BASE_URL = 'http://localhost:8000';
-const API_BASE_URL = 'http://192.168.15.23:8000';
+// ── CONFIGURAÇÃO ─────────────────────────────────
+const API_BASE     = 'http://192.168.15.23:8000';
+const CHAT_URL     = '/chat';
+const STATUS_URL   = '/llm-status';
+const LIMITE_HIST  = 10;   // pares de mensagens antes do aviso
 
+// ── ESTADO ───────────────────────────────────────
+let historicoIA   = [];   // [{role, content}]
+let playerAtivo   = null; // referência ao audio element ativo
 
-const appState = {
-    selectedCategories: ['geral'],
-    currentBoletim: null,
-    audioPlayer: null,
-    isPlaying: false,
-    config: {
-        ai_summary_mode: 'groq',
-        tts_engine: 'gtts',
-        style: 'jornalistico'
-    }
-};
+// ── ELEMENTOS ────────────────────────────────────
+const elMessages      = document.getElementById('messages');
+const elChatInput     = document.getElementById('chatInput');
+const elBtnEnviar     = document.getElementById('btnEnviar');
+const elBtnLimpar     = document.getElementById('btnLimpar');
+const elBtnConfig     = document.getElementById('btnConfig');
+const elBtnFechar     = document.getElementById('btnFecharSidebar');
+const elBtnLimparSide = document.getElementById('btnLimparSidebar');
+const elSidebar       = document.getElementById('sidebar');
+const elOverlay       = document.getElementById('sidebarOverlay');
+const elStatusDot     = document.getElementById('statusDot');
+const elStatusTexto   = document.getElementById('statusTexto');
+const elInputAviso    = document.getElementById('inputAviso');
+const elLoading       = document.getElementById('loadingOverlay');
+const elBtnSalvar     = document.getElementById('btnSalvar');
+const elBtnZoomIn    = document.getElementById('btnZoomIn');
+const elBtnZoomOut   = document.getElementById('btnZoomOut');
+const elInfoModelo    = document.getElementById('infoModelo');
 
-// ========================================
-// ELEMENTOS DO DOM
-// ========================================
-const elements = {
-    // Navegação
-    configBtn: document.getElementById('configBtn'),
-    sidebar: document.getElementById('sidebar'),
-    closeSidebar: document.getElementById('closeSidebar'),
-    overlay: document.getElementById('overlay'),
-    
-    // News Area
-    newsArea: document.getElementById('newsArea'),
-    placeholder: document.getElementById('placeholder'),
-    newsText: document.getElementById('newsText'),
-    
-    // Player
-    playerSection: document.getElementById('playerSection'),
-    audioPlayer: document.getElementById('audioPlayer'),
-    playBtn: document.getElementById('playBtn'),
-    progressFill: document.getElementById('progressFill'),
-    currentTime: document.getElementById('currentTime'),
-    duration: document.getElementById('duration'),
-    volumeBtn: document.getElementById('volumeBtn'),
-    downloadBtn: document.getElementById('downloadBtn'),
-    
-    // Categories
-    categoryBtns: document.querySelectorAll('.category-btn'),
-    
-    // Generate
-    generateBtn: document.getElementById('generateBtn'),
-    resetBtn: document.getElementById('resetBtn'),
-    loadingOverlay: document.getElementById('loadingOverlay'),
-    
-    // Ticker
-    tickerContent: document.getElementById('tickerContent'),
-    
-    // Config Inputs
-    summaryMode: document.getElementById('summaryMode'),
-    groqKey: document.getElementById('groqKey'),
-    ttsEngine: document.getElementById('ttsEngine'),
-    elevenLabsKey: document.getElementById('elevenLabsKey'),
-    gnewsKey: document.getElementById('gnewsKey'),
-    articlesPerCategory: document.getElementById('articlesPerCategory'), 
-    boletimStyle: document.getElementById('boletimStyle'),
-    saveConfigBtn: document.getElementById('saveConfigBtn')
-};
+// Config inputs
+const elTtsEngine    = document.getElementById('ttsEngine');
+const elElevenKey    = document.getElementById('elevenLabsKey');
+const elSummaryMode  = document.getElementById('summaryMode');
+const elGroqKey      = document.getElementById('groqKey');
+const elGnewsKey     = document.getElementById('gnewsKey');
 
-// ========================================
-// INICIALIZAÇÃO
-// ========================================
-async function init() {
-    console.log('🎙️ Sistema ON AIR inicializando (Versão Smart)...');
-    
-    setupEventListeners();
-    setupKeyboardShortcuts();
-    await loadConfig();
-    startTicker();
-    
-    console.log('✅ Sistema pronto!');
-}
+// ── INICIALIZAÇÃO ─────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  setupEventListeners();
+  verificarStatus();
+  carregarConfig();
+  iniciarZoom();
+  elChatInput.focus();
+});
 
-// ========================================
-// EVENT LISTENERS
-// ========================================
+// ── EVENT LISTENERS ───────────────────────────────
 function setupEventListeners() {
-    elements.configBtn.addEventListener('click', openSidebar);
-    elements.closeSidebar.addEventListener('click', closeSidebar);
-    elements.overlay.addEventListener('click', closeSidebar);
-    
-    elements.categoryBtns.forEach(btn => {
-        btn.addEventListener('click', toggleCategory);
-    });
-    
-    elements.generateBtn.addEventListener('click', generateBoletim);
-    
-    elements.playBtn.addEventListener('click', togglePlay);
-    elements.downloadBtn.addEventListener('click', downloadAudio);
-    elements.volumeBtn.addEventListener('click', toggleMute);
-    
-    elements.audioPlayer.addEventListener('loadedmetadata', updateDuration);
-    elements.audioPlayer.addEventListener('timeupdate', updateProgress);
-    elements.audioPlayer.addEventListener('ended', onAudioEnded);
-    
-    document.querySelector('.progress-bar').addEventListener('click', seekAudioMouse);
-    elements.saveConfigBtn.addEventListener('click', saveConfig);
-    btnEdit.addEventListener('click', enterEditMode);
-    btnCancelEdit.addEventListener('click', exitEditMode);
-    btnSaveAudio.addEventListener('click', saveAndRegenerateAudio);
-    btnCopy.addEventListener('click', copyTextToClipboard);
-    btnSaveTextOnly.addEventListener('click', saveTextOnly);
-    if (resetBtn) resetBtn.addEventListener('click', resetInterface);
-}
-
-function setupKeyboardShortcuts() {
-    document.addEventListener('keydown', (e) => {
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
-            if (e.key === 'Escape') closeSidebar();
-            return;
-        }
-
-        switch (e.code) {
-            case 'Space':
-            case 'KeyK':
-                e.preventDefault(); 
-                if (!elements.playerSection.hidden) togglePlay();
-                break;
-            case 'ArrowLeft':
-            case 'KeyJ':
-                if (!elements.playerSection.hidden) skipAudio(-5);
-                break;
-            case 'ArrowRight':
-            case 'KeyL':
-                if (!elements.playerSection.hidden) skipAudio(5);
-                break;
-            case 'Escape':
-                closeSidebar();
-                break;
-        }
-    });
-}
-
-// ========================================
-// LÓGICA DE CATEGORIAS (SMART)
-// ========================================
-function toggleCategory(e) {
-    const btn = e.currentTarget;
-    const category = btn.dataset.category;
-    
-    // 1. Se já está ativo, tenta desmarcar
-    if (btn.classList.contains('active')) {
-        // Impede desmarcar o último para não ficar lista vazia
-        if (appState.selectedCategories.length > 1) {
-            btn.classList.remove('active');
-            btn.setAttribute('aria-pressed', 'false');
-            appState.selectedCategories = appState.selectedCategories.filter(c => c !== category);
-        } else {
-            console.warn("⚠️ Mínimo de 1 categoria necessária.");
-        }
-    } else {
-        // 2. Se está inativo, vai marcar
-        btn.classList.add('active');
-        btn.setAttribute('aria-pressed', 'true');
-        
-        // --- PROTEÇÃO INTELIGENTE ---
-        // Se escolheu algo específico (ex: Esportes) e 'Geral' estava marcado, remove 'Geral'.
-        if (category !== 'geral' && appState.selectedCategories.includes('geral')) {
-            const geralBtn = document.querySelector('.category-btn[data-category="geral"]');
-            if (geralBtn) {
-                geralBtn.classList.remove('active');
-                geralBtn.setAttribute('aria-pressed', 'false');
-                appState.selectedCategories = appState.selectedCategories.filter(c => c !== 'geral');
-                console.log("🛡️ 'Geral' removido para focar no tema específico.");
-            }
-        }
-        
-        if (!appState.selectedCategories.includes(category)) {
-            appState.selectedCategories.push(category);
-        }
+  // Envio de mensagem
+  elBtnEnviar.addEventListener('click', enviarMensagem);
+  elChatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      enviarMensagem();
     }
-    
-    console.log(`📂 Seleção Atual:`, appState.selectedCategories);
+  });
+
+  // Auto-resize do textarea
+  elChatInput.addEventListener('input', () => {
+    elChatInput.style.height = 'auto';
+    elChatInput.style.height = Math.min(elChatInput.scrollHeight, 120) + 'px';
+  });
+
+  // Sidebar
+  elBtnConfig.addEventListener('click', abrirSidebar);
+  elBtnFechar.addEventListener('click', fecharSidebar);
+  elOverlay.addEventListener('click', fecharSidebar);
+
+  // Limpar conversa
+  elBtnLimpar.addEventListener('click', confirmarLimpar);
+  elBtnLimparSide.addEventListener('click', confirmarLimpar);
+
+  // Salvar config
+  elBtnSalvar.addEventListener('click', salvarConfig);
+
+  // Escape fecha sidebar
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') fecharSidebar();
+  });
+
+  // Zoom
+  if (elBtnZoomIn)  elBtnZoomIn.addEventListener('click', () => {
+    const atual = parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue('--zoom') || '1');
+    aplicarZoom(Math.round((atual + 0.1) * 10) / 10);
+  });
+  if (elBtnZoomOut) elBtnZoomOut.addEventListener('click', () => {
+    const atual = parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue('--zoom') || '1');
+    aplicarZoom(Math.round((atual - 0.1) * 10) / 10);
+  });
 }
 
-// ========================================
-// GERAR BOLETIM
-// ========================================
-async function generateBoletim() {
-    console.log('🎤 Iniciando geração...');
-    
-    // Validação de Segurança
-    if (appState.selectedCategories.length === 0) {
-        showError("Selecione pelo menos uma categoria.");
-        return;
+// ── STATUS DO SISTEMA ─────────────────────────────
+async function verificarStatus() {
+  try {
+    const r = await fetch(STATUS_URL, { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    const online = d.api_boletim === 'online';
+
+    elStatusDot.className   = 'status-dot ' + (online ? 'online' : 'offline');
+    elStatusTexto.textContent = online
+      ? `${d.modelo || '...'} · online`
+      : 'API offline';
+
+    if (elInfoModelo) {
+      elInfoModelo.innerHTML = `
+        <strong>Modelo: ${d.modelo || '—'}</strong>
+        Modo: ${d.llm_modo || 'ollama'}<br>
+        ${d.tools ? d.tools.length : 0} ferramentas disponíveis<br>
+        API Boletim: ${online ? '✓ online' : '✗ offline'}
+      `;
     }
+  } catch {
+    elStatusDot.className   = 'status-dot offline';
+    elStatusTexto.textContent = 'Assistente offline';
+    if (elInfoModelo) {
+      elInfoModelo.innerHTML = '<strong>Não disponível</strong>Verifique se interface_locutor.py está rodando.';
+    }
+  }
+}
 
-    elements.loadingOverlay.removeAttribute('hidden');
-    elements.generateBtn.disabled = true;
-    elements.newsText.setAttribute('hidden', '');
+// ── RENDERIZAÇÃO DE MENSAGENS ─────────────────────
+function adicionarMsg(role, conteudo) {
+  const wrap = document.createElement('div');
+  wrap.className = `msg msg-${role}`;
 
-    // Se o elemento não existir (campo novo), usa padrão 3
-    const perCategory = elements.articlesPerCategory ? (parseInt(elements.articlesPerCategory.value) || 3) : 3;
-    const totalLimit = (perCategory * appState.selectedCategories.length);
+  if (role === 'user' || role === 'ai') {
+    const label = document.createElement('div');
+    label.className = 'msg-label';
+    label.textContent = role === 'user' ? 'Você' : 'Assistente';
+    wrap.appendChild(label);
+  }
 
-    console.log('🚀 ENVIANDO:', {
-        topics: appState.selectedCategories,
-        total: totalLimit
+  if (role === 'waiting') {
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.innerHTML = '<span class="dot-anim"></span><span class="dot-anim"></span><span class="dot-anim"></span>';
+    wrap.appendChild(bubble);
+    elMessages.appendChild(wrap);
+    elMessages.scrollTop = elMessages.scrollHeight;
+    return wrap;
+  }
+
+  if (typeof conteudo === 'string') {
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.textContent = conteudo;
+    wrap.appendChild(bubble);
+  } else {
+    // conteudo é um elemento DOM (card de boletim)
+    wrap.appendChild(conteudo);
+  }
+
+  elMessages.appendChild(wrap);
+  elMessages.scrollTop = elMessages.scrollHeight;
+  return wrap;
+}
+
+// ── CARD DE BOLETIM ───────────────────────────────
+function criarCardBoletim(id, filename, texto, categorias) {
+  const cardId = `card-${Date.now()}`;
+
+  const card = document.createElement('div');
+  card.className = 'card-boletim';
+  card.setAttribute('role', 'article');
+  card.setAttribute('aria-label', `Boletim gerado ID ${id}`);
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'card-header';
+  header.innerHTML = `<span>📻 Boletim #${id || '—'}</span><span>${categorias || ''}</span>`;
+  card.appendChild(header);
+
+  // Texto guardado no dataset para o botão copiar (não exibido — já aparece na bolha)
+  card.dataset.texto = texto || '';
+
+  // Player
+  if (filename) {
+    const audioUrl = `/audio/${filename}?t=${Date.now()}`;
+    const audio    = document.createElement('audio');
+    audio.src      = audioUrl;
+    audio.preload  = 'metadata';
+
+    const playerDiv = document.createElement('div');
+    playerDiv.className = 'card-player';
+
+    const playBtn = document.createElement('button');
+    playBtn.className   = 'play-btn';
+    playBtn.textContent = '▶';
+    playBtn.setAttribute('aria-label', 'Play/Pause');
+
+    const progressWrap = document.createElement('div');
+    progressWrap.className = 'player-progress-wrap';
+
+    const bar = document.createElement('div');
+    bar.className = 'player-bar';
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', '100');
+    bar.setAttribute('aria-valuenow', '0');
+
+    const fill = document.createElement('div');
+    fill.className = 'player-fill';
+    bar.appendChild(fill);
+
+    const time = document.createElement('div');
+    time.className = 'player-time';
+    time.innerHTML = '<span class="cur">0:00</span><span class="dur">0:00</span>';
+
+    progressWrap.appendChild(bar);
+    progressWrap.appendChild(time);
+
+    const dlBtn = document.createElement('button');
+    dlBtn.className = 'download-btn';
+    dlBtn.textContent = '⬇';
+    dlBtn.setAttribute('aria-label', 'Download do áudio');
+
+    playerDiv.appendChild(playBtn);
+    playerDiv.appendChild(progressWrap);
+    playerDiv.appendChild(dlBtn);
+    playerDiv.appendChild(audio);
+    card.appendChild(playerDiv);
+
+    // Eventos do player
+    playBtn.addEventListener('click', () => {
+      if (playerAtivo && playerAtivo !== audio) {
+        playerAtivo.pause();
+      }
+      if (audio.paused) {
+        audio.play();
+        playBtn.textContent = '⏸';
+        playerAtivo = audio;
+      } else {
+        audio.pause();
+        playBtn.textContent = '▶';
+      }
     });
 
+    audio.addEventListener('loadedmetadata', () => {
+      time.querySelector('.dur').textContent = formatTime(audio.duration);
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+      fill.style.width = pct + '%';
+      bar.setAttribute('aria-valuenow', Math.round(pct));
+      time.querySelector('.cur').textContent = formatTime(audio.currentTime);
+    });
+
+    audio.addEventListener('ended', () => {
+      playBtn.textContent = '▶';
+      fill.style.width = '0%';
+    });
+
+    bar.addEventListener('click', (e) => {
+      const rect = bar.getBoundingClientRect();
+      const pct  = (e.clientX - rect.left) / rect.width;
+      audio.currentTime = pct * audio.duration;
+    });
+
+    dlBtn.addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href     = audioUrl;
+      a.download = filename;
+      a.click();
+    });
+  }
+
+  // Botão copiar
+  const acoes = document.createElement('div');
+  acoes.className = 'card-acoes';
+
+  const btnCopiar = document.createElement('button');
+  btnCopiar.className = 'btn-copiar';
+  btnCopiar.innerHTML = '📋 Copiar texto';
+  btnCopiar.setAttribute('aria-label', 'Copiar texto do boletim para a área de transferência');
+
+  btnCopiar.addEventListener('click', async () => {
+    const t = card.dataset.texto || '';
     try {
-        const response = await fetch(`${API_BASE_URL}/api/generate-boletim`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                categories: appState.selectedCategories, // ATENÇÃO: Backend espera 'categories', não 'topics' no Pydantic novo
-                num_articles: totalLimit,
-                style: appState.config.style,
-                include_intro: true,
-                include_outro: true,
-                summary_mode: appState.config.ai_summary_mode,
-                tts_engine: appState.config.tts_engine
-            })
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || `Erro HTTP: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        appState.currentBoletim = data;
-        displayBoletim(data);
-        
-    } catch (error) {
-        console.error('❌ Erro:', error);
-        showError(`Erro: ${error.message}`);
-    } finally {
-        elements.loadingOverlay.setAttribute('hidden', '');
-        elements.generateBtn.disabled = false;
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(t);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = t;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      btnCopiar.innerHTML = '✓ Copiado!';
+      btnCopiar.classList.add('copiado');
+      setTimeout(() => {
+        btnCopiar.innerHTML = '📋 Copiar texto';
+        btnCopiar.classList.remove('copiado');
+      }, 2500);
+    } catch {
+      btnCopiar.textContent = 'Erro ao copiar';
     }
+  });
+
+  acoes.appendChild(btnCopiar);
+  card.appendChild(acoes);
+
+  return card;
 }
 
-// ========================================
-// EXIBIR E TOCAR (ATUALIZADA)
-// ========================================
-function displayBoletim(data) {
-    // 1. Esconde o Placeholder
-    elements.placeholder.setAttribute('hidden', '');
+// ── PARSE DA RESPOSTA DO ASSISTENTE ──────────────
+function parsearResposta(texto) {
+  // Detecta se a resposta contém um boletim gerado
+  const matchFilename = texto.match(/boletim_(\d{8}_\d{6})\.mp3/);
+  const matchId       = texto.match(/ID:\s*(\d+)/i);
 
-    // 2. Exibe o Texto e ATUALIZA O LETREIRO (Breaking News)
-    elements.newsText.innerHTML = data.summary_text.replace(/\n/g, '<br>'); 
-    elements.newsText.removeAttribute('hidden');
-    
-    // --- LINHA NOVA ADICIONADA AQUI ---
-    updateTickerWithNews(data.summary_text); 
-    // ----------------------------------
+  if (!matchFilename) return null;
 
-    // 3. Lógica do Editor (Reseta o estado da edição)
-    if (newsEditor) {
-        newsEditor.hidden = true;
-        newsEditor.value = ""; 
-        editControls.hidden = false; 
-        btnEdit.hidden = false;      
-        saveCancelGroup.hidden = true; 
-        // Se você incluiu o botão Copiar/Grupo de leitura:
-        if (typeof readModeGroup !== 'undefined') readModeGroup.hidden = false;
+  const filename   = `boletim_${matchFilename[1]}.mp3`;
+  const id         = matchId ? matchId[1] : '—';
+
+  // Extrai texto do boletim (tudo após a linha do áudio)
+  const linhas = texto.split('\n');
+  const idxAudio = linhas.findIndex(l => l.includes('.mp3'));
+  let textoBoletim = '';
+  let categorias   = '';
+
+  if (idxAudio !== -1) {
+    textoBoletim = linhas.slice(idxAudio + 1).join('\n').trim();
+    // Tenta extrair categoria
+    const matchCat = texto.match(/categoria[s]?[:\s]+([^\n.]+)/i);
+    if (matchCat) categorias = matchCat[1].trim();
+  }
+
+  return { id, filename, texto: textoBoletim, categorias };
+}
+
+// ── ENVIO DE MENSAGEM ─────────────────────────────
+async function enviarMensagem() {
+  const pergunta = elChatInput.value.trim();
+  if (!pergunta || elBtnEnviar.disabled) return;
+
+  // Adiciona mensagem do usuário
+  adicionarMsg('user', pergunta);
+  elChatInput.value = '';
+  elChatInput.style.height = 'auto';
+
+  // Desabilita durante processamento
+  elBtnEnviar.disabled = true;
+  elChatInput.disabled = true;
+  elLoading.removeAttribute('hidden');
+
+  // Adiciona bolha de espera
+  const aguarde = adicionarMsg('waiting', '');
+
+  try {
+    const r = await fetch(CHAT_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ pergunta, historico: historicoIA })
+    });
+
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    aguarde.remove();
+
+    const resposta = d.resposta || 'Sem resposta.';
+
+    // Atualiza histórico
+    historicoIA.push({ role: 'user',      content: pergunta  });
+    historicoIA.push({ role: 'assistant', content: resposta  });
+
+    // Aviso de contexto longo
+    const pares = historicoIA.length / 2;
+    if (pares >= LIMITE_HIST) {
+      elInputAviso.classList.add('visivel');
+      // Remove par mais antigo para manter o limite
+      historicoIA = historicoIA.slice(2);
     }
 
-    // 4. Configura o Player de Áudio
-    if (data.audio_filename && data.audio_filename.endsWith('.mp3')) {
-        const timestamp = new Date().getTime();
-        const audioUrl = `${API_BASE_URL}/audio/${data.audio_filename}?t=${timestamp}`;
-        
-        elements.audioPlayer.src = audioUrl;
-        elements.audioPlayer.load();
-        elements.playerSection.removeAttribute('hidden');
-        
-        setTimeout(() => {
-            elements.playBtn.focus();
-            showSuccessToast("Boletim pronto!");
-        }, 500);
-        
+    // Tenta criar card de boletim
+    const boletim = parsearResposta(resposta);
+    if (boletim && boletim.texto) {
+      // Mostra resposta textual do assistente
+      const textoSemBoletim = resposta.split('\n')
+        .filter(l => !l.includes('.mp3') && !l.startsWith('ID:'))
+        .join('\n').trim();
+
+      if (textoSemBoletim) adicionarMsg('ai', textoSemBoletim);
+
+      // Cria e adiciona o card
+      const card = criarCardBoletim(boletim.id, boletim.filename, boletim.texto, boletim.categorias);
+      const msgWrap = document.createElement('div');
+      msgWrap.className = 'msg msg-ai';
+      msgWrap.appendChild(card);
+      elMessages.appendChild(msgWrap);
+      elMessages.scrollTop = elMessages.scrollHeight;
     } else {
-        elements.playerSection.setAttribute('hidden', '');
-        elements.newsText.focus();
+      adicionarMsg('ai', resposta);
     }
+
+  } catch (err) {
+    aguarde.remove();
+    adicionarMsg('ai', 'Erro ao comunicar com o assistente. Verifique se interface_locutor.py está rodando.');
+    console.error(err);
+  } finally {
+    elBtnEnviar.disabled = false;
+    elChatInput.disabled = false;
+    elLoading.setAttribute('hidden', '');
+    elChatInput.focus();
+  }
 }
 
-// ========================================
-// UTILITÁRIOS E CONFIG
-// ========================================
-function openSidebar() {
-    elements.sidebar.classList.add('active');
-    elements.overlay.removeAttribute('hidden');
+// ── SIDEBAR ───────────────────────────────────────
+function abrirSidebar() {
+  elSidebar.classList.add('aberta');
+  elOverlay.classList.add('visivel');
+  elOverlay.removeAttribute('aria-hidden');
+  elBtnFechar.focus();
 }
 
-function closeSidebar() {
-    elements.sidebar.classList.remove('active');
-    elements.overlay.setAttribute('hidden', '');
+function fecharSidebar() {
+  elSidebar.classList.remove('aberta');
+  elOverlay.classList.remove('visivel');
+  elOverlay.setAttribute('aria-hidden', 'true');
+  elBtnConfig.focus();
 }
 
-async function loadConfig() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/config`);
-        if (response.ok) {
-            const config = await response.json();
-            if (elements.summaryMode) elements.summaryMode.value = config.AI_SUMMARY_MODE || 'groq';
-            if (elements.ttsEngine) elements.ttsEngine.value = config.TTS_ENGINE || 'gtts';
-            
-            // Atualiza estado local
-            appState.config.ai_summary_mode = config.AI_SUMMARY_MODE;
-            appState.config.tts_engine = config.TTS_ENGINE;
-        }
-    } catch (e) {
-        console.warn('Config offline');
-    }
+// ── LIMPAR CONVERSA ───────────────────────────────
+function confirmarLimpar() {
+  if (!confirm('Limpar toda a conversa?')) return;
+  limparConversa();
+  fecharSidebar();
 }
 
-async function saveConfig() {
-    const originalText = elements.saveConfigBtn.textContent;
-    elements.saveConfigBtn.textContent = 'Salvando...';
-    
-    const configData = {
-        ai_summary_mode: elements.summaryMode.value,
-        tts_engine: elements.ttsEngine.value,
-        groq_api_key: elements.groqKey.value || null,
-        elevenlabs_api_key: elements.elevenLabsKey.value || null,
-        gnews_api_key: elements.gnewsKey.value || null
+function limparConversa() {
+  historicoIA = [];
+  elInputAviso.classList.remove('visivel');
+  elMessages.innerHTML = `
+    <div class="msg msg-system">
+      <div class="msg-bubble">Conversa limpa. Pronto para novas solicitações.</div>
+    </div>`;
+  if (playerAtivo) { playerAtivo.pause(); playerAtivo = null; }
+}
+
+// ── CONFIGURAÇÕES ─────────────────────────────────
+async function carregarConfig() {
+  try {
+    const r = await fetch(`${API_BASE}/api/config`);
+    if (!r.ok) return;
+    const c = await r.json();
+    if (elTtsEngine   && c.TTS_ENGINE)      elTtsEngine.value   = c.TTS_ENGINE;
+    if (elSummaryMode && c.AI_SUMMARY_MODE) elSummaryMode.value = c.AI_SUMMARY_MODE;
+  } catch { /* silencioso */ }
+}
+
+async function salvarConfig() {
+  const originalText = elBtnSalvar.textContent;
+  elBtnSalvar.textContent = 'Salvando...';
+  elBtnSalvar.disabled = true;
+
+  try {
+    const payload = {
+      ai_summary_mode:    elSummaryMode?.value || 'none',
+      tts_engine:         elTtsEngine?.value   || 'gtts',
+      groq_api_key:       elGroqKey?.value     || null,
+      elevenlabs_api_key: elElevenKey?.value   || null,
+      gnews_api_key:      elGnewsKey?.value    || null
     };
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/config`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(configData)
-        });
-        
-        if (response.ok) {
-            showSuccess('Configurações salvas!');
-            await loadConfig();
-        } else {
-            throw new Error('Falha ao salvar');
-        }
-    } catch (error) {
-        showError('Erro ao salvar config.');
-    } finally {
-        elements.saveConfigBtn.textContent = originalText;
-    }
+
+    const r = await fetch(`${API_BASE}/api/config`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload)
+    });
+
+    elBtnSalvar.textContent = r.ok ? '✓ Salvo!' : '✗ Erro';
+    setTimeout(() => {
+      elBtnSalvar.textContent = originalText;
+      elBtnSalvar.disabled    = false;
+    }, 2000);
+  } catch {
+    elBtnSalvar.textContent = '✗ Erro de conexão';
+    setTimeout(() => {
+      elBtnSalvar.textContent = originalText;
+      elBtnSalvar.disabled    = false;
+    }, 2000);
+  }
 }
 
-// Funções do Player (Play/Pause, Seek, etc)
-function togglePlay() {
-    if (elements.audioPlayer.paused) {
-        elements.audioPlayer.play();
-        elements.playBtn.textContent = '⏸️';
-    } else {
-        elements.audioPlayer.pause();
-        elements.playBtn.textContent = '▶️';
-    }
-}
-function updateProgress() {
-    const cur = elements.audioPlayer.currentTime;
-    const dur = elements.audioPlayer.duration || 1;
-    elements.progressFill.style.width = `${(cur/dur)*100}%`;
-    elements.currentTime.textContent = formatTime(cur);
-}
-function updateDuration() {
-    elements.duration.textContent = formatTime(elements.audioPlayer.duration);
-}
-function seekAudioMouse(e) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width;
-    elements.audioPlayer.currentTime = pct * elements.audioPlayer.duration;
-}
-function onAudioEnded() {
-    elements.playBtn.textContent = '▶️';
-    elements.progressFill.style.width = '0%';
-}
-function toggleMute() {
-    elements.audioPlayer.muted = !elements.audioPlayer.muted;
-    elements.volumeBtn.textContent = elements.audioPlayer.muted ? '🔇' : '🔊';
-}
-function downloadAudio() {
-    if (elements.audioPlayer.src) {
-        const a = document.createElement('a');
-        a.href = elements.audioPlayer.src;
-        a.download = `boletim_${Date.now()}.mp3`;
-        a.click();
-    }
-}
-function skipAudio(s) {
-    elements.audioPlayer.currentTime += s;
-}
+// ── UTILITÁRIOS ───────────────────────────────────
 function formatTime(s) {
-    if (isNaN(s)) return '0:00';
-    const m = Math.floor(s/60);
-    const sc = Math.floor(s%60);
-    return `${m}:${sc.toString().padStart(2,'0')}`;
-}
-function showError(msg) { alert('❌ ' + msg); }
-function showSuccess(msg) { console.log('✅ ' + msg); }
-function showSuccessToast(msg) { console.log(msg); }
-function startTicker() {
-    const d = new Date().toLocaleDateString('pt-BR');
-    elements.tickerContent.textContent = `🎙️ Sistema Operacional • ${d} • Aguardando...`;
+  if (isNaN(s) || s === Infinity) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
-document.addEventListener('DOMContentLoaded', init);
-
-// ========================================
-// LÓGICA DE EDIÇÃO (NOVO)
-// ========================================
-
-function enterEditMode() {
-    // 1. Pega o texto atual (sem HTML)
-    const currentText = elements.newsText.innerText;
-    
-    // 2. Preenche o editor
-    newsEditor.value = currentText;
-    
-    // 3. Troca a visualização
-    elements.newsText.hidden = true;     // Esconde texto fixo
-    newsEditor.hidden = false;           // Mostra caixa de edição
-    newsEditor.focus();                  // Foca para digitar
-    
-    // 4. Troca os botões
-    btnEdit.hidden = true;               // Esconde lápis
-    saveCancelGroup.hidden = false;      // Mostra Salvar/Cancelar
-    saveCancelGroup.style.display = 'flex'; 
+// ── ZOOM ─────────────────────────────────────────
+function iniciarZoom() {
+  const salvo = parseFloat(localStorage.getItem('boletim-zoom') || '1');
+  aplicarZoom(salvo);
 }
 
-function exitEditMode() {
-    // Apenas desfaz a troca visual (cancela)
-    newsEditor.hidden = true;
-    elements.newsText.hidden = false;
-    
-    saveCancelGroup.hidden = true;
-    btnEdit.hidden = false;
+function aplicarZoom(v) {
+  v = Math.max(0.8, Math.min(1.6, v));
+  document.documentElement.style.setProperty('--zoom', v);
+  localStorage.setItem('boletim-zoom', v);
+
+  // Feedback acessível no título dos botões
+  const pct = Math.round(v * 100);
+  if (elBtnZoomIn)  elBtnZoomIn.title  = `Aumentar fonte (atual: ${pct}%)`;
+  if (elBtnZoomOut) elBtnZoomOut.title = `Diminuir fonte (atual: ${pct}%)`;
 }
 
-function saveTextOnly() {
-    const newText = newsEditor.value;
-    if (!newText.trim()) return alert("Texto vazio!");
-
-    // 1. Atualiza o visual
-    elements.newsText.innerHTML = newText.replace(/\n/g, '<br>');
-    elements.newsText.innerText = newText; // Atualiza o texto puro também
-    
-    // 2. Sai do modo de edição
-    exitEditMode();
-
-    // 3. AVISO IMPORTANTE:
-    // Se mudou o texto, o áudio antigo não serve mais.
-    // Escondemos o player para evitar confusão (Texto diz A, Áudio diz B).
-    elements.playerSection.setAttribute('hidden', '');
-    alert("Texto salvo! ⚠️ O áudio foi ocultado pois não corresponde mais ao texto novo. Gere um novo áudio se desejar ouvir.");
-}
-
-async function copyTextToClipboard() {
-    const text = elements.newsText.innerText;
-    
-    // Função auxiliar para feedback visual e auditivo
-    const setSuccessUI = () => {
-        const originalText = btnCopy.innerHTML;
-        btnCopy.innerHTML = "✅ Copiado!";
-        setTimeout(() => btnCopy.innerHTML = originalText, 2000);
-        showSuccessToast("Texto copiado para a área de transferência!");
-    };
-
-    // 1. Tenta o método moderno (Funciona em localhost ou HTTPS)
-    if (navigator.clipboard && window.isSecureContext) {
-        try {
-            await navigator.clipboard.writeText(text);
-            setSuccessUI();
-            return;
-        } catch (err) {
-            console.warn("Clipboard API falhou, tentando fallback...", err);
-        }
-    }
-
-    // 2. Método Fallback (Funciona em HTTP e Redes Locais)
-    // Criamos um elemento invisível para o sistema de cópia antigo
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    
-    // Garante que o elemento não apareça na tela mas seja acessível
-    textArea.style.position = "fixed";
-    textArea.style.left = "-9999px";
-    textArea.style.top = "0";
-    document.body.appendChild(textArea);
-    
-    textArea.focus();
-    textArea.select();
-
-    try {
-        const successful = document.execCommand('copy');
-        if (successful) {
-            setSuccessUI();
-        } else {
-            showError("Não foi possível copiar automaticamente.");
-        }
-    } catch (err) {
-        console.error("Erro ao copiar no fallback:", err);
-        showError("Erro ao copiar texto.");
-    }
-
-    document.body.removeChild(textArea);
-}
-
-async function saveAndRegenerateAudio() {
-    const newText = newsEditor.value;
-    
-    // Validação básica
-    if (!newText.trim()) {
-        alert("O texto não pode estar vazio!");
-        return;
-    }
-
-    // Feedback visual (Travando botão)
-    const originalLabel = btnSaveAudio.innerHTML;
-    btnSaveAudio.innerHTML = "⏳ Gerando Áudio...";
-    btnSaveAudio.disabled = true;
-
-    try {
-        // Prepara o envio para a API
-        const payload = {
-            text: newText,
-            // Usa as configs atuais
-            tts_engine: appState.config.tts_engine || "gtts",
-            tts_voice_id: "21m00Tcm4TlvDq8ikWAM"
-        };
-
-        // Chama o endpoint de regeneração
-        const res = await fetch(`${API_BASE_URL}/api/generate-audio`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) throw new Error("Erro ao gerar áudio");
-
-        const data = await res.json();
-
-        // SUCESSO!
-        // Atualiza a tela simulando um boletim novo
-        displayBoletim({
-            summary_text: newText,
-            audio_filename: data.audio_filename
-        });
-
-        showSuccessToast("Texto e áudio atualizados!");
-
-    } catch (error) {
-        console.error(error);
-        showError("Erro ao regenerar áudio.");
-        
-        // Em caso de erro, destrava o botão para tentar de novo
-        btnSaveAudio.innerHTML = originalLabel;
-        btnSaveAudio.disabled = false;
-    } finally {
-        // Se deu certo, o displayBoletim já reseta a UI.
-        // Se deu erro, precisamos destravar o botão.
-        // Por segurança, restauramos o botão aqui.
-        if (!btnSaveAudio.disabled) { 
-             // Só restaura se não tiver sido resetado pelo displayBoletim
-             btnSaveAudio.innerHTML = originalLabel;
-        }
-    }
-}
-
-
-// ========================================
-// ATUALIZAR O LETREIRO (BREAKING NEWS)
-// ========================================
-function updateTickerWithNews(text) {
-    if (!elements.tickerContent) return;
-
-    // 1. Remove quebras de linha e espaços extras do texto original
-    const cleanText = text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-
-    // 2. Monta a string única com separadores chamativos
-    const tickerText = `🚨 ÚLTIMAS NOTÍCIAS: ${cleanText} • 🚨 BREAKING NEWS: ${cleanText} • `;
-
-    // 3. Insere no HTML (repetimos o texto para garantir que não haja vácuo na rolagem)
-    elements.tickerContent.innerHTML = tickerText + tickerText;
-    
-    // 4. Reinicia a animação
-    elements.tickerContent.style.animation = 'none';
-    elements.tickerContent.offsetHeight; // Reset técnico
-    
-    // Ajuste a velocidade aqui (ex: 60s para texto longo, 30s para curto)
-    elements.tickerContent.style.animation = 'scroll 160s linear infinite';
-}
-
-function resetInterface() {
-    console.log("🧹 Limpando interface...");
-
-    // 1. Para o áudio e remove a origem
-    if (elements.audioPlayer) {
-        elements.audioPlayer.pause();
-        elements.audioPlayer.src = "";
-    }
-
-    // 2. Esconde as áreas de conteúdo
-    elements.playerSection.setAttribute('hidden', '');
-    elements.newsText.setAttribute('hidden', '');
-    
-    // 3. Se o editor estiver aberto, fecha-o
-    if (typeof newsEditor !== 'undefined') newsEditor.hidden = true;
-    if (typeof editControls !== 'undefined') editControls.hidden = true;
-
-    // 4. Mostra o placeholder original
-    elements.placeholder.removeAttribute('hidden');
-
-    // 5. Opcional: Limpa o letreiro (Ticker)
-    if (elements.tickerContent) {
-        elements.tickerContent.textContent = "🎙️ Sistema Operacional • Aguardando...";
-        elements.tickerContent.style.animation = 'none';
-    }
-
-    // Joga o foco para o topo para acessibilidade (NVDA)
-    document.querySelector('h1').focus();
-}
-
-
-// ========================================
-// INTERFACE DE COMANDOS
-// ========================================
-
-const CATEGORIAS_VALIDAS = [
-    'geral', 'politica', 'economia', 'tecnologia',
-    'esportes', 'entretenimento', 'saude', 'ciencia', 'mundo'
-];
-
-const cmdInput    = document.getElementById('comandoInput');
-const cmdBtn      = document.getElementById('comandoBtn');
-const cmdFeedback = document.getElementById('comandoFeedback');
-
-function cmdMostrarFeedback(msg, tipo) {
-    if (!cmdFeedback) return;
-    tipo = tipo || 'ok';
-    cmdFeedback.textContent = msg;
-    cmdFeedback.className = 'comando-feedback ' + tipo;
-    cmdFeedback.style.display = 'block';
-    if (tipo !== 'erro') {
-        setTimeout(function() { cmdFeedback.style.display = 'none'; }, 6000);
-    }
-}
-
-function cmdSetLoading(ativo) {
-    if (!cmdBtn || !cmdInput) return;
-    cmdBtn.disabled   = ativo;
-    cmdInput.disabled = ativo;
-    cmdBtn.textContent = ativo ? '⏳' : '▶ Executar';
-}
-
-async function interpretarComando(raw) {
-    var texto = (raw || '').trim().toLowerCase();
-    if (!texto) return;
-
-    cmdFeedback.style.display = 'none';
-
-    var partes = texto.split(/\s+/);
-    var acao   = partes[0];
-
-    // AJUDA
-    if (acao === 'ajuda' || acao === 'help') {
-        cmdMostrarFeedback(
-            'Comandos disponíveis: ' +
-            'gerar [categoria] [n] · ' +
-            'historico · ' +
-            'apagar [id] · ' +
-            'audio [texto] · ' +
-            'categorias · ' +
-            'status · ' +
-            'limpar',
-            'info'
-        );
-        return;
-    }
-
-    // CATEGORIAS
-    if (acao === 'categorias') {
-        cmdMostrarFeedback(
-            'Categorias: geral · politica · economia · tecnologia · ' +
-            'esportes · entretenimento · saude · ciencia · mundo',
-            'info'
-        );
-        return;
-    }
-
-    // LIMPAR
-    if (acao === 'limpar' || acao === 'clear') {
-        resetInterface();
-        cmdMostrarFeedback('✓ Tela limpa.', 'ok');
-        return;
-    }
-
-    // STATUS
-    if (acao === 'status') {
-        cmdSetLoading(true);
-        try {
-            var r = await fetch(API_BASE_URL + '/health');
-            if (r.ok) {
-                cmdMostrarFeedback('✓ Sistema online e operacional.', 'ok');
-            } else {
-                cmdMostrarFeedback('✗ API não respondeu corretamente.', 'erro');
-            }
-        } catch(e) {
-            cmdMostrarFeedback('✗ Sem conexão com o servidor.', 'erro');
-        } finally {
-            cmdSetLoading(false);
-        }
-        return;
-    }
-
-    // HISTORICO
-    if (acao === 'historico' || acao === 'hist') {
-        cmdSetLoading(true);
-        try {
-            var r = await fetch(API_BASE_URL + '/api/historico');
-            var lista = await r.json();
-            if (!lista.length) {
-                cmdMostrarFeedback('Nenhum boletim encontrado.', 'info');
-                return;
-            }
-            var resumo = lista.slice(0, 5).map(function(b) {
-                var data = b.timestamp
-                    ? new Date(b.timestamp).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-                    : '';
-                return '#' + b.id + ' · ' + (b.categories || '') + ' · ' + data;
-            }).join(' | ');
-            cmdMostrarFeedback(lista.length + ' boletins. Últimos: ' + resumo, 'info');
-        } catch(e) {
-            cmdMostrarFeedback('✗ Erro ao buscar histórico.', 'erro');
-        } finally {
-            cmdSetLoading(false);
-        }
-        return;
-    }
-
-    // APAGAR
-    if (acao === 'apagar' || acao === 'deletar') {
-        var id = parseInt(partes[1]);
-        if (isNaN(id)) {
-            cmdMostrarFeedback('✗ Informe o id. Exemplo: apagar 154', 'erro');
-            return;
-        }
-        if (!confirm('Confirma a exclusão do boletim #' + id + '?')) return;
-        cmdSetLoading(true);
-        try {
-            var r = await fetch(API_BASE_URL + '/api/historico/' + id, { method: 'DELETE' });
-            if (r.ok) {
-                cmdMostrarFeedback('✓ Boletim #' + id + ' removido.', 'ok');
-            } else {
-                cmdMostrarFeedback('✗ Boletim #' + id + ' não encontrado.', 'erro');
-            }
-        } catch(e) {
-            cmdMostrarFeedback('✗ Erro ao apagar boletim.', 'erro');
-        } finally {
-            cmdSetLoading(false);
-        }
-        return;
-    }
-
-    // AUDIO
-    if (acao === 'audio' || acao === 'narrar') {
-        var textoCrudo = partes.slice(1).join(' ').trim();
-        if (!textoCrudo) {
-            cmdMostrarFeedback('✗ Informe o texto. Exemplo: audio Bom dia', 'erro');
-            return;
-        }
-        cmdSetLoading(true);
-        cmdMostrarFeedback('⏳ Gerando áudio...', 'info');
-        try {
-            var r = await fetch(API_BASE_URL + '/api/generate-audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text: textoCrudo,
-                    tts_engine: appState.config.tts_engine || 'gtts',
-                    tts_voice_id: '21m00Tcm4TlvDq8ikWAM'
-                })
-            });
-            if (!r.ok) throw new Error('Falha na API');
-            var d = await r.json();
-            displayBoletim({ summary_text: textoCrudo, audio_filename: d.audio_filename });
-            cmdMostrarFeedback('✓ Áudio gerado: ' + d.audio_filename, 'ok');
-        } catch(e) {
-            cmdMostrarFeedback('✗ Erro ao gerar áudio.', 'erro');
-        } finally {
-            cmdSetLoading(false);
-        }
-        return;
-    }
-
-    // GERAR
-    if (acao === 'gerar' || acao === 'gera') {
-        var resto = partes.slice(1);
-        var categorias = [];
-        var quantidade = 5;
-        resto.forEach(function(p) {
-            var n = parseInt(p);
-            if (!isNaN(n) && n > 0 && n <= 20) {
-                quantidade = n;
-            } else if (CATEGORIAS_VALIDAS.indexOf(p) !== -1) {
-                categorias.push(p);
-            }
-        });
-        if (categorias.length === 0) categorias = ['geral'];
-
-        cmdSetLoading(true);
-        cmdMostrarFeedback('⏳ Gerando boletim: ' + categorias.join(', ') + ', ' + quantidade + ' notícias...', 'info');
-        elements.loadingOverlay.removeAttribute('hidden');
-        elements.generateBtn.disabled = true;
-
-        try {
-            var r = await fetch(API_BASE_URL + '/api/generate-boletim', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    categories: categorias,
-                    num_articles: quantidade * categorias.length,
-                    style: appState.config.style || 'jornalistico',
-                    include_intro: true,
-                    include_outro: true,
-                    summary_mode: appState.config.ai_summary_mode || 'groq',
-                    tts_engine: appState.config.tts_engine || 'gtts'
-                })
-            });
-            if (!r.ok) {
-                var err = await r.json();
-                throw new Error(err.detail || 'HTTP ' + r.status);
-            }
-            var d = await r.json();
-            appState.currentBoletim = d;
-            displayBoletim(d);
-            cmdMostrarFeedback('✓ Boletim #' + d.id + ' gerado. ' + categorias.join(', ') + ', ' + quantidade + ' notícias.', 'ok');
-        } catch(e) {
-            cmdMostrarFeedback('✗ Erro: ' + e.message, 'erro');
-        } finally {
-            cmdSetLoading(false);
-            elements.loadingOverlay.setAttribute('hidden', '');
-            elements.generateBtn.disabled = false;
-        }
-        return;
-    }
-
-    // DESCONHECIDO
-    cmdMostrarFeedback('✗ Comando "' + acao + '" não reconhecido. Digite: ajuda', 'erro');
-}
-
-if (cmdInput && cmdBtn) {
-    cmdInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            interpretarComando(cmdInput.value);
-            cmdInput.value = '';
-        }
-    });
-    cmdBtn.addEventListener('click', function() {
-        interpretarComando(cmdInput.value);
-        cmdInput.value = '';
-        cmdInput.focus();
-    });
-}
+// Atualiza status a cada 60s
+setInterval(verificarStatus, 60000);

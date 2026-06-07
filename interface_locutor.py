@@ -1,12 +1,15 @@
 """
-interface_locutor.py — Interface web acessível para o locutor cego
+interface_locutor.py — Backend de IA para o Boletim de Notícias
 
-Serve uma página HTML minimalista com campo de conversa.
-O Orca, NVDA e TalkBack leem páginas web muito melhor que terminais.
+Expõe endpoint /chat com suporte a histórico de conversa.
+Dual mode: Ollama (local) ou Groq (nuvem) configurado via LLM_MODO no .env
 
 Uso:
   uv run python interface_locutor.py
-  Acesse: http://localhost:5000  (ou http://IP-DA-MAQUINA:5000 na rede local)
+
+Variáveis de ambiente:
+  LLM_MODO=ollama  → usa Ollama local (padrão, requer GPU)
+  LLM_MODO=groq    → usa Groq API (recomendado para hardware modesto)
 """
 
 import asyncio
@@ -33,12 +36,28 @@ from mcp.client.stdio import stdio_client
 
 load_dotenv()
 
+# Modo LLM: "ollama" (local, requer GPU) ou "groq" (nuvem, leve)
+LLM_MODO        = os.getenv("LLM_MODO",      "ollama")
+
+# Ollama
 OLLAMA_URL      = os.getenv("OLLAMA_URL",    "http://localhost:11434/api/chat")
-MODELO          = os.getenv("OLLAMA_MODELO", "qwen2.5:7b")
+OLLAMA_MODELO   = os.getenv("OLLAMA_MODELO", "qwen2.5:7b")
+
+# Groq
+GROQ_API_KEY    = os.getenv("GROQ_API_KEY",  "")
+GROQ_URL        = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODELO     = os.getenv("GROQ_MODELO",   "llama-3.1-8b-instant")
+
+# Modelo ativo (para exibição no status)
+MODELO          = OLLAMA_MODELO if LLM_MODO == "ollama" else GROQ_MODELO
+
 BOLETIM_API_URL = os.getenv("BOLETIM_API_URL", "http://localhost:8000")
 USUARIO_ATUAL   = os.getenv("MCP_USUARIO",   "locutor")
 LOG_FILE        = os.getenv("MCP_LOG_FILE",  "audit_locutor.log")
 PORTA_WEB       = int(os.getenv("PORTA_WEB", "5000"))
+
+# Limite de trocas no histórico antes de alertar
+LIMITE_HISTORICO = int(os.getenv("LIMITE_HISTORICO", "10"))
 
 _BASE           = Path(__file__).parent
 SERVIDOR_PYTHON = str(_BASE / ".venv" / "bin" / "python")
@@ -161,30 +180,130 @@ sessao = SessaoMCP()
 # CONVERSA COM OLLAMA
 # ================================================
 
-async def conversar(pergunta: str) -> str:
-    historico = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user",   "content": pergunta}
-    ]
+def _preparar_historico_groq(historico: list) -> list:
+    """
+    Converte o histórico interno para o formato exigido pelo Groq.
+    O Groq exige que tool_calls.arguments seja string JSON, não dict.
+    """
+    resultado = []
+    for msg in historico:
+        m = dict(msg)
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            tcs = []
+            for tc in m["tool_calls"]:
+                args = tc["function"]["arguments"]
+                tcs.append({
+                    "id":   tc.get("id", f"call_{tc['function']['name']}"),
+                    "type": "function",
+                    "function": {
+                        "name":      tc["function"]["name"],
+                        "arguments": json.dumps(args, ensure_ascii=False)
+                                     if isinstance(args, dict) else (args or "{}")
+                    }
+                })
+            m = dict(m)
+            m["tool_calls"] = tcs
+        resultado.append(m)
+    return resultado
 
-    while True:
-        try:
-            resp = requests.post(OLLAMA_URL, json={
-                "model":    MODELO,
+
+def _chamar_llm(historico: list) -> dict:
+    """Chama o LLM configurado (Ollama ou Groq) e retorna a resposta."""
+    if LLM_MODO == "groq":
+        if not GROQ_API_KEY:
+            raise ValueError("GROQ_API_KEY não configurada no .env")
+        resp = requests.post(
+            GROQ_URL,
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type":  "application/json"
+            },
+            json={
+                "model":       GROQ_MODELO,
+                "messages":    _preparar_historico_groq(historico),
+                "tools":       sessao.tools_ollama(),
+                "tool_choice": "auto",
+                "stream":      False
+            },
+            timeout=60
+        ).json()
+        # Groq usa formato OpenAI — normaliza para o formato interno
+        if "choices" not in resp:
+            raise ValueError(resp.get("error", {}).get("message", "Resposta inesperada do Groq"))
+        choice = resp["choices"][0]
+        msg = choice["message"]
+        # Normaliza tool_calls
+        # Internamente usamos dict para arguments
+        # Mas ao reenviar ao Groq, precisamos de string — tratado no _montar_historico_groq
+        if msg.get("tool_calls"):
+            tool_calls_normalizados = []
+            for tc in msg["tool_calls"]:
+                args_raw = tc["function"].get("arguments") or "{}"
+                if isinstance(args_raw, str):
+                    try:
+                        args = json.loads(args_raw) if args_raw.strip() else {}
+                    except json.JSONDecodeError:
+                        args = {}
+                elif isinstance(args_raw, dict):
+                    args = args_raw
+                else:
+                    args = {}
+                tool_calls_normalizados.append({
+                    "id": tc.get("id", f"call_{tc['function']['name']}"),
+                    "type": "function",
+                    "function": {
+                        "name":      tc["function"]["name"],
+                        "arguments": args  # dict internamente
+                    }
+                })
+            msg["tool_calls"] = tool_calls_normalizados
+
+        # Remove content None
+        if msg.get("content") is None:
+            msg["content"] = ""
+
+        return {"message": msg}
+    else:
+        # Ollama
+        resp = requests.post(
+            OLLAMA_URL,
+            json={
+                "model":    OLLAMA_MODELO,
                 "messages": historico,
                 "tools":    sessao.tools_ollama(),
                 "stream":   False
-            }, timeout=300).json()
+            },
+            timeout=300
+        ).json()
+        if "message" not in resp:
+            raise ValueError(resp.get("error", "Resposta inesperada do Ollama"))
+        return resp
+
+
+async def conversar(pergunta: str, historico_anterior: list = None) -> str:
+    """
+    Processa uma pergunta com histórico de conversa opcional.
+    historico_anterior: lista de {"role": "user"|"assistant", "content": str}
+    """
+    # Monta o histórico completo
+    historico = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    # Adiciona histórico anterior (sem o system prompt duplicado)
+    if historico_anterior:
+        for msg in historico_anterior:
+            if msg.get("role") != "system":
+                historico.append(msg)
+
+    historico.append({"role": "user", "content": pergunta})
+
+    while True:
+        try:
+            resp = _chamar_llm(historico)
         except requests.exceptions.Timeout:
             return "O modelo demorou para responder. Tente novamente."
         except Exception as e:
-            return f"Erro de comunicação com o modelo: {e}"
-
-        # Proteção contra resposta inesperada do Ollama
-        if "message" not in resp:
-            erro = resp.get("error", "Resposta inesperada do modelo.")
-            registrar("erro_ollama", erro)
-            return f"Erro do modelo: {erro}. Verifique se o Ollama está rodando com 'ollama ps'."
+            registrar("erro_llm", str(e))
+            return f"Erro ao comunicar com o modelo ({LLM_MODO}): {e}"
 
         msg = resp["message"]
         historico.append(msg)
@@ -205,7 +324,13 @@ async def conversar(pergunta: str) -> str:
                 except Exception as e:
                     conteudo = f"Erro ao executar '{nome}': {e}"
                     logger.error(conteudo)
-                historico.append({"role": "tool", "content": conteudo})
+
+                # Groq exige tool_call_id na mensagem de resultado
+                tool_msg = {"role": "tool", "content": conteudo}
+                if LLM_MODO == "groq":
+                    tool_msg["tool_call_id"] = tc.get("id", f"call_{nome}")
+                    tool_msg["name"] = nome
+                historico.append(tool_msg)
         else:
             registrar("resposta", msg["content"][:200])
             return msg["content"]
@@ -228,15 +353,32 @@ async def lifespan(app):
 
 app = FastAPI(title="Boletim ON AIR — Assistente", lifespan=lifespan)
 
+@app.post("/chat")
+async def endpoint_chat(request: Request):
+    """Endpoint principal — aceita pergunta + histórico de conversa."""
+    dados    = await request.json()
+    pergunta = (dados.get("pergunta") or "").strip()
+    historico_anterior = dados.get("historico", [])
+
+    if not pergunta:
+        return JSONResponse({"resposta": "Por favor, digite uma pergunta."})
+
+    registrar("pergunta", pergunta[:200])
+    resposta = await conversar(pergunta, historico_anterior)
+    return JSONResponse({"resposta": resposta})
+
+
 @app.post("/conversar")
 async def endpoint_conversar(request: Request):
-    dados = await request.json()
+    """Endpoint legado — mantido para compatibilidade."""
+    dados    = await request.json()
     pergunta = (dados.get("pergunta") or "").strip()
     if not pergunta:
         return JSONResponse({"resposta": "Por favor, digite uma pergunta."})
-    registrar("pergunta", pergunta[:200])
+    registrar("pergunta_legado", pergunta[:200])
     resposta = await conversar(pergunta)
     return JSONResponse({"resposta": resposta})
+
 
 @app.get("/status")
 async def status():
@@ -247,8 +389,10 @@ async def status():
         api_ok = False
     return JSONResponse({
         "api_boletim": "online" if api_ok else "offline",
-        "tools": sessao.tools_names,
-        "modelo": MODELO
+        "tools":       sessao.tools_names,
+        "modelo":      MODELO,
+        "llm_modo":    LLM_MODO,
+        "limite_historico": LIMITE_HISTORICO
     })
 
 @app.get("/", response_class=HTMLResponse)
