@@ -605,8 +605,49 @@ html, body {
 
 /* ── RESPONSIVO ──────────────────────────────── */
 @media (max-width: 640px) {
-  .msg { max-width: 92%; }
+  :root {
+    --header-h: 52px;
+    --sidebar-w: 100%;
+  }
+
+  /* Header: compacto, sem quebra de linha */
+  .header { padding: 0 10px; gap: 6px; }
+  .header-brand h1 { font-size: 0.78rem; letter-spacing: 0.06em; }
+  .header-brand .mic { font-size: 1.1rem; }
+  .header-brand { gap: 6px; }
+
+  /* Status: trunca com ellipsis — não quebra o header */
+  .header-status { min-width: 0; flex-shrink: 1; overflow: hidden; }
+  #statusTexto {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 110px;
+    font-size: 0.68rem;
+  }
+
+  /* Botões do header: menores, sem zoom em mobile (menos relevante) */
+  .header-actions { gap: 4px; }
+  .btn-icon { width: 32px; height: 32px; font-size: 0.9rem; }
+  .btn-zoom { display: none; }
+
+  /* Mensagens */
+  .messages { padding: 12px 10px 10px; gap: 12px; }
+  .msg { max-width: 94%; }
+  .msg-bubble { padding: 10px 13px; font-size: 0.9rem; }
+
+  /* Card do boletim */
+  .card-boletim { max-width: 100%; }
+  .card-header { font-size: 0.72rem; padding: 8px 12px; }
+  .card-player { padding: 8px 12px; gap: 8px; }
+  .card-acoes  { padding: 8px 12px; }
+
+  /* Input */
+  .input-area { padding: 8px 10px 10px; }
+  .chat-input { padding: 10px 12px; font-size: 0.9rem; min-height: 44px; }
+  .btn-send   { padding: 10px 14px; font-size: 0.9rem; }
+
+  /* Sidebar cobre a tela toda */
   .sidebar { width: 100%; }
-  .header-brand h1 { font-size: 0.85rem; }
-  .btn-send { padding: 12px 16px; font-size: 0.88rem; }
+  .sidebar-content { padding: 16px; }
 }
