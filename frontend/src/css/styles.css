@@ -616,20 +616,14 @@ html, body {
   .header-brand .mic { font-size: 1.1rem; }
   .header-brand { gap: 6px; }
 
-  /* Status: trunca com ellipsis — não quebra o header */
-  .header-status { min-width: 0; flex-shrink: 1; overflow: hidden; }
-  #statusTexto {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 110px;
-    font-size: 0.68rem;
-  }
+  /* Status: mostra só o dot colorido — texto completo disponível na sidebar */
+  #statusTexto { display: none; }
+  .header-status { gap: 0; flex-shrink: 0; }
 
-  /* Botões do header: menores, sem zoom em mobile (menos relevante) */
-  .header-actions { gap: 4px; }
-  .btn-icon { width: 32px; height: 32px; font-size: 0.9rem; }
-  .btn-zoom { display: none; }
+  /* Todos os 4 botões visíveis, levemente menores */
+  .header-actions { gap: 3px; }
+  .btn-icon { width: 30px; height: 30px; font-size: 0.85rem; }
+  .btn-zoom { display: flex; font-size: 0.6rem; min-width: 30px; }
 
   /* Mensagens */
   .messages { padding: 12px 10px 10px; gap: 12px; }
