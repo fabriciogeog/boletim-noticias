@@ -39,6 +39,13 @@ testa_vozes_disponiveis.py
 # Áudios gerados
 audio/*.mp3
 audio/*.txt
+backend/app/audio/*.mp3
+
+# Backups manuais
+*.bak_*
+
+# Banco de dados runtime
+data/boletim.db
 
 # Frontend antigo
 frontend_OLD_*/
