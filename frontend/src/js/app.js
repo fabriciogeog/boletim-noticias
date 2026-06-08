@@ -326,7 +326,10 @@ function criarCardBoletim(id, filename, texto, categorias) {
 
 // ── PARSE DA RESPOSTA DO ASSISTENTE ──────────────
 function parsearResposta(texto) {
-  // Detecta se a resposta contém um boletim gerado
+  // Só renderiza player quando o assistente confirma geração de um boletim novo.
+  // Evita disparar em respostas de listagem que também contêm nomes de arquivo .mp3.
+  if (!texto.includes('Boletim gerado com sucesso')) return null;
+
   const matchFilename = texto.match(/boletim_(\d{8}_\d{6})\.mp3/);
   const matchId       = texto.match(/ID:\s*(\d+)/i);
 
