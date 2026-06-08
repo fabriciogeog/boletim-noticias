@@ -1,70 +1,134 @@
-📻 Sistema de Boletim de Notícias
-Sistema automatizado para geração de boletins de notícias, desenvolvido com foco em acessibilidade e autonomia para locutores de rádio que utilizam leitores de tela.
+# 🎙️ Boletim ON AIR
 
-O sistema agora permite o uso híbrido, funcionando tanto em notebooks quanto em smartphones via rede local (intranet), com interface otimizada para gestos de toque.
+Sistema de geração de boletins de notícias com IA, desenvolvido para locutores de rádio com deficiência visual. Permite criar, narrar e gerenciar boletins via linguagem natural em um chat acessível, acessível de qualquer dispositivo na rede local.
 
-🎯 Características Principais
-✅ Coleta Inteligente: Notícias em tempo real via GNews.io.
+---
 
-🎙️ Processamento via IA: Sumarização profissional utilizando Groq.
+## Arquitetura
 
-🔊 Narração Versátil: Suporte para gTTS (Google) e vozes premium da ElevenLabs.
+```
+[ Navegador / Smartphone ]
+         │
+         ▼
+  [ nginx : 3001 ]  ←── Frontend estático (HTML/CSS/JS)
+         │
+         ├── /api/*   →  [ FastAPI : 8000 ]  ←── Docker
+         │                    │
+         │              SQLite + áudios MP3
+         │
+         └── /chat    →  [ interface_locutor.py : 5000 ]  ←── Host
+                              │
+                         [ servidor_mcp.py ]  ←── MCP tools
+                              │
+                    [ Groq API ] ou [ Ollama local ]
+```
 
-📱 Mobile-Friendly: Design responsivo com botões grandes e áreas de toque otimizadas para TalkBack e VoiceOver.
+Dois containers Docker (`api` + `frontend`) + um processo Python no host (`interface_locutor.py`).
 
-♿ Acessibilidade Plena: Navegação por teclado, atalhos dedicados e compatibilidade total com NVDA.
+---
 
-🐋 Arquitetura Docker: Execução simplificada em Ubuntu 24.04 e Windows.
+## Requisitos
 
-📋 Requisitos e APIs
-Software
-Docker e Docker Compose.
+- Docker e Docker Compose
+- Python 3.11+ e [uv](https://github.com/astral-sh/uv) (para o processo no host)
+- Ollama instalado localmente (opcional — apenas se usar modo local)
 
-Navegador: Chrome ou Safari (recomendados para mobile).
+### Chaves de API
 
-🔑 Chaves de API (Configurar no arquivo .env)
-Este projeto utiliza três motores principais:
+| Serviço | Uso | Obrigatório |
+|---|---|---|
+| [GNews](https://gnews.io) | Coleta de notícias | Sim |
+| [Groq](https://console.groq.com) | Assistente IA (chat) e sumarização | Sim |
+| [ElevenLabs](https://elevenlabs.io) | Narração premium | Não |
 
-GNews.io: Coleta de notícias.
+---
 
-Groq: Sumarização das notícias via IA.
+## Instalação
 
-ElevenLabs (Opcional): Para narração de alta fidelidade.
+### 1. Configurar o `.env`
 
-🚀 Instalação e Execução
-1. Preparação
-2. Inicialização
-Para subir o sistema no host (Ubuntu ou Windows):
+Copie o modelo e preencha as chaves:
 
-🌐 Configuração de Rede Local (Mobile)
-Para que um colega acesse o sistema pelo smartphone na mesma rede Wi-Fi:
+```bash
+cp .env.example .env   # ou edite o .env diretamente
+```
 
-No Host: Descubra o IP da máquina (ex: 192.168.1.15).
+Variáveis principais:
 
-No Código: No arquivo frontend/src/js/app.js, altere a variável API_BASE_URL para o IP do host (ex: http://192.168.1.15:8000).
+```env
+GNEWS_API_KEY=sua_chave
+GROQ_API_KEY=sua_chave
+ELEVENLABS_API_KEY=sua_chave   # opcional
 
-No Celular: Acesse no navegador http://IP-DO-HOST:3000.
+TTS_ENGINE=gtts                # gtts | elevenlabs
+AI_SUMMARY_MODE=groq           # groq | local | none
+LLM_MODO=groq                  # groq | ollama
+GROQ_MODELO=meta-llama/llama-4-scout-17b-16e-instruct
+```
 
-Dica: Adicione o site à "Tela de Início" do celular para usá-lo como um aplicativo nativo.
+### 2. Subir os containers Docker
 
-📂 Scripts de Manutenção
-O projeto inclui scripts automatizados para facilitar a gestão:
+```bash
+docker compose up -d
+```
 
-./sync_git.sh: Sincroniza as alterações de código com o GitHub.
+Frontend: http://localhost:3001  
+API: http://localhost:8000/docs
 
-./migrar_dados.sh exportar: Cria um backup completo (.tar.gz) dos áudios, banco de dados e configurações para migração.
+### 3. Iniciar o assistente IA (no host)
 
-./migrar_dados.sh importar: Restaura o sistema a partir de um arquivo de backup em um novo host.
+```bash
+uv run python interface_locutor.py
+```
 
-♿ Acessibilidade e Atalhos
-O sistema responde aos seguintes comandos de teclado no navegador:
+---
 
-Espaço ou K: Inicia ou pausa a reprodução do áudio.
+## Acesso pela rede local (smartphone)
 
-J / L: Retrocede ou avança 5 segundos no áudio.
+Acesse pelo IP da máquina host na porta 3001:
 
-ESC: Fecha menus de configuração e sobreposições.
+```
+http://192.168.x.x:3001
+```
 
-Botão Copiar: Implementado com fallback para funcionar em dispositivos móveis via rede local sem HTTPS.
+Recomenda-se adicionar à tela inicial do celular para uso como app.
 
-Desenvolvido para promover a inclusão digital e a autonomia profissional de locutores cegos.
+---
+
+## Uso
+
+A interface é um chat em linguagem natural. Exemplos de comandos:
+
+- `gera um boletim de esportes com 5 notícias`
+- `lista o histórico de boletins`
+- `lê o boletim de id 42`
+- `exclui todos os boletins com id menor ou igual a 100`
+- `verifica o sistema`
+
+### Atalhos de teclado
+
+| Tecla | Ação |
+|---|---|
+| `Enter` | Enviar mensagem |
+| `Shift+Enter` | Nova linha |
+| `A+` / `A−` | Aumentar / diminuir fonte |
+
+---
+
+## Estrutura do projeto
+
+```
+boletim-noticias/
+├── backend/app/        # FastAPI — coleta, sumarização, TTS, banco
+├── frontend/src/       # Interface web (HTML/CSS/JS + nginx)
+├── interface_locutor.py # Servidor do chat IA (porta 5000)
+├── servidor_mcp.py     # Ferramentas MCP expostas ao LLM
+├── audio/              # Arquivos MP3 gerados (não versionados)
+├── data/               # Banco SQLite (não versionado)
+├── docker-compose.yml
+└── .env                # Configurações e chaves (não versionado)
+```
+
+---
+
+Desenvolvido para promover a inclusão digital e a autonomia profissional de locutores com deficiência visual.
