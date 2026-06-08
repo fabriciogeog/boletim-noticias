@@ -719,7 +719,36 @@ async function enviar() {
 # INICIALIZAÇÃO
 # ================================================
 
+def _liberar_porta(porta: int) -> None:
+    """Encerra qualquer processo ocupando a porta antes de subir."""
+    import signal
+    try:
+        import psutil
+        for proc in psutil.process_iter(["pid", "name"]):
+            try:
+                for conn in proc.net_connections(kind="inet"):
+                    if conn.laddr.port == porta and proc.pid != os.getpid():
+                        print(f"[INFO] Encerrando instância anterior (PID {proc.pid}) na porta {porta}...")
+                        proc.send_signal(signal.SIGTERM)
+                        proc.wait(timeout=5)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except ImportError:
+        # fallback sem psutil: usa lsof
+        import subprocess
+        result = subprocess.run(
+            ["lsof", "-ti", f":{porta}"], capture_output=True, text=True
+        )
+        for pid_str in result.stdout.strip().splitlines():
+            pid = int(pid_str)
+            if pid != os.getpid():
+                print(f"[INFO] Encerrando instância anterior (PID {pid}) na porta {porta}...")
+                os.kill(pid, signal.SIGTERM)
+
+
 if __name__ == "__main__":
+    _liberar_porta(PORTA_WEB)
+
     # Verifica pré-requisitos
     erros = []
     if not Path(SERVIDOR_PYTHON).exists():
