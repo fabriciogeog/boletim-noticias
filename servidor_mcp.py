@@ -46,9 +46,10 @@ async def gerar_boletim(
     motor_tts: str = "gtts",
     modo_resumo: str = "none"
 ) -> dict:
-    """Gera um boletim de notícias completo com áudio MP3.
+    """Gera um boletim de notícias NOVO com áudio MP3. Use APENAS para criar boletins novos.
+    NÃO use para listar, consultar ou mostrar boletins já existentes — use listar_historico.
     Use esta tool quando o usuário disser frases como:
-    'gera um boletim', 'cria um boletim', 'quero ouvir notícias',
+    'gera um boletim', 'cria um boletim', 'quero um boletim novo',
     'faz um boletim de esportes', 'gera 5 notícias de tecnologia'.
     Parâmetro categorias: lista com um ou mais temas.
     Valores aceitos para categorias: 'geral', 'esportes', 'tecnologia',
@@ -124,8 +125,12 @@ async def listar_historico() -> str:
     Use esta tool quando o usuário fizer perguntas como:
     'quantos boletins foram gerados', 'quais boletins existem',
     'mostra o histórico', 'que boletins temos', 'boletins anteriores',
-    'o que já foi gerado', 'lista os boletins', 'histórico de boletins'.
-    Não use esta tool para gerar novos boletins.
+    'o que já foi gerado', 'lista os boletins', 'histórico de boletins',
+    'mostre os mais recentes', 'quais os últimos boletins',
+    'mostre os 10 mais recentes', 'liste por id e assunto',
+    'quais boletins temos salvos', 'mostra os boletins de hoje',
+    'últimos boletins gerados', 'quais são os boletins disponíveis'.
+    NUNCA use gerar_boletim para responder consultas sobre boletins existentes.
     Retorna quantidade total e lista resumida com id, data, categoria e arquivo de áudio."""
     try:
         boletins = await _get("/api/historico")
