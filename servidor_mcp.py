@@ -120,34 +120,36 @@ async def regenerar_audio(
 
 
 @mcp.tool()
-async def listar_historico() -> str:
-    """Lista todos os boletins já gerados e salvos no sistema.
-    Use esta tool quando o usuário fizer perguntas como:
+async def listar_historico(limite: int = 0) -> str:
+    """Lista boletins já gerados e salvos no sistema. NÃO gera boletins novos.
+    Use esta tool para CONSULTAR ou MOSTRAR boletins existentes, como:
     'quantos boletins foram gerados', 'quais boletins existem',
     'mostra o histórico', 'que boletins temos', 'boletins anteriores',
     'o que já foi gerado', 'lista os boletins', 'histórico de boletins',
     'mostre os mais recentes', 'quais os últimos boletins',
     'mostre os 10 mais recentes', 'liste por id e assunto',
     'quais boletins temos salvos', 'mostra os boletins de hoje',
-    'últimos boletins gerados', 'quais são os boletins disponíveis'.
-    NUNCA use gerar_boletim para responder consultas sobre boletins existentes.
-    Retorna quantidade total e lista resumida com id, data, categoria e arquivo de áudio."""
+    'últimos boletins gerados', 'quais são os boletins disponíveis',
+    'liste os 5 últimos', 'mostre os 3 mais recentes por id e categoria'.
+    Parâmetro limite: quantidade máxima a exibir (0 = todos, até 50).
+    Retorna total geral e lista com id, data, categoria e arquivo de áudio."""
     try:
         boletins = await _get("/api/historico")
         if not boletins:
             return "Nenhum boletim gerado ainda."
-        LIMITE = 50
         total = len(boletins)
-        linhas = [f"Total: {total} boletim(ns) gerado(s).\n"]
-        for b in boletins[:LIMITE]:
+        exibir = limite if 1 <= limite <= 50 else 50
+        selecionados = boletins[:exibir]
+        linhas = [f"Total no sistema: {total} boletim(ns).\n"]
+        for b in selecionados:
             data = b.get("timestamp", "")[:16] if b.get("timestamp") else "?"
             linhas.append(
                 f"ID {b.get('id')} | {data} | "
                 f"{b.get('categories', '?')} | "
                 f"{b.get('audio_filename', 'sem áudio')}"
             )
-        if total > LIMITE:
-            linhas.append(f"\n(exibindo os {LIMITE} mais recentes de {total} total)")
+        if total > exibir:
+            linhas.append(f"\n(exibindo os {exibir} mais recentes de {total} total)")
         return "\n".join(linhas)
     except httpx.ConnectError:
         return "Erro: API não está respondendo. Verifique se o Docker está rodando."
