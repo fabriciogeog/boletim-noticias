@@ -131,14 +131,18 @@ async def listar_historico() -> str:
         boletins = await _get("/api/historico")
         if not boletins:
             return "Nenhum boletim gerado ainda."
-        linhas = [f"Total: {len(boletins)} boletim(ns) gerado(s).\n"]
-        for b in boletins[:20]:
+        LIMITE = 50
+        total = len(boletins)
+        linhas = [f"Total: {total} boletim(ns) gerado(s).\n"]
+        for b in boletins[:LIMITE]:
             data = b.get("timestamp", "")[:16] if b.get("timestamp") else "?"
             linhas.append(
                 f"ID {b.get('id')} | {data} | "
                 f"{b.get('categories', '?')} | "
                 f"{b.get('audio_filename', 'sem áudio')}"
             )
+        if total > LIMITE:
+            linhas.append(f"\n(exibindo os {LIMITE} mais recentes de {total} total)")
         return "\n".join(linhas)
     except httpx.ConnectError:
         return "Erro: API não está respondendo. Verifique se o Docker está rodando."
