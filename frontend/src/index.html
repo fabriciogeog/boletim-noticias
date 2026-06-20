@@ -135,6 +135,17 @@
         <!-- Modelo IA -->
         <div class="config-group">
           <h3>🤖 Assistente IA</h3>
+          <label for="llmModo">Modo do assistente:</label>
+          <select id="llmModo">
+            <option value="groq">Groq — Nuvem (recomendado)</option>
+            <option value="ollama">Ollama — Local (requer GPU)</option>
+          </select>
+          <label for="groqModelo">Modelo de chat (Groq):</label>
+          <select id="groqModelo">
+            <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B — Recomendado</option>
+            <option value="llama-3.3-70b-versatile">Llama 3.3 70B — Preciso (limite baixo)</option>
+            <option value="llama-3.1-8b-instant">Llama 3.1 8B — Rápido (pode alucinar)</option>
+          </select>
           <div class="info-box" id="infoModelo">
             <strong>Carregando...</strong>
           </div>

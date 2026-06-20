@@ -220,17 +220,20 @@ def _preparar_historico_groq(historico: list) -> list:
 
 def _chamar_llm(historico: list) -> dict:
     """Chama o LLM configurado (Ollama ou Groq) e retorna a resposta."""
-    if LLM_MODO == "groq":
-        if not GROQ_API_KEY:
+    llm_modo   = os.getenv("LLM_MODO",    LLM_MODO)
+    groq_key   = os.getenv("GROQ_API_KEY", GROQ_API_KEY)
+    groq_model = os.getenv("GROQ_MODELO",  GROQ_MODELO)
+    if llm_modo == "groq":
+        if not groq_key:
             raise ValueError("GROQ_API_KEY não configurada no .env")
         resp = requests.post(
             GROQ_URL,
             headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Authorization": f"Bearer {groq_key}",
                 "Content-Type":  "application/json"
             },
             json={
-                "model":       GROQ_MODELO,
+                "model":       groq_model,
                 "messages":    _preparar_historico_groq(historico),
                 "tools":       sessao.tools_ollama(),
                 "tool_choice": "auto",
@@ -276,10 +279,11 @@ def _chamar_llm(historico: list) -> dict:
         return {"message": msg}
     else:
         # Ollama
+        ollama_model = os.getenv("OLLAMA_MODELO", OLLAMA_MODELO)
         resp = requests.post(
-            OLLAMA_URL,
+            os.getenv("OLLAMA_URL", OLLAMA_URL),
             json={
-                "model":    OLLAMA_MODELO,
+                "model":    ollama_model,
                 "messages": historico,
                 "tools":    sessao.tools_ollama(),
                 "stream":   False
@@ -352,7 +356,7 @@ async def conversar(pergunta: str, historico_anterior: list = None) -> str:
             return "O modelo demorou para responder. Tente novamente."
         except Exception as e:
             registrar("erro_llm", str(e))
-            return f"Erro ao comunicar com o modelo ({LLM_MODO}): {e}"
+            return f"Erro ao comunicar com o modelo ({os.getenv('LLM_MODO', LLM_MODO)}): {e}"
 
         msg = resp["message"]
         historico.append(msg)
@@ -429,6 +433,18 @@ async def endpoint_conversar(request: Request):
     return JSONResponse({"resposta": resposta})
 
 
+@app.post("/llm-reload")
+async def llm_reload():
+    """Recarrega as configurações de LLM do arquivo .env sem reiniciar o processo."""
+    load_dotenv(override=True)
+    llm_modo   = os.getenv("LLM_MODO",    LLM_MODO)
+    groq_model = os.getenv("GROQ_MODELO", GROQ_MODELO)
+    ollama_mod = os.getenv("OLLAMA_MODELO", OLLAMA_MODELO)
+    modelo_ativo = ollama_mod if llm_modo == "ollama" else groq_model
+    registrar("llm_reload", f"modo={llm_modo} modelo={modelo_ativo}")
+    return JSONResponse({"ok": True, "llm_modo": llm_modo, "modelo": modelo_ativo})
+
+
 @app.get("/status")
 async def status():
     try:
@@ -436,11 +452,15 @@ async def status():
         api_ok = r.status_code == 200
     except Exception:
         api_ok = False
+    llm_modo     = os.getenv("LLM_MODO",     LLM_MODO)
+    groq_model   = os.getenv("GROQ_MODELO",  GROQ_MODELO)
+    ollama_model = os.getenv("OLLAMA_MODELO", OLLAMA_MODELO)
+    modelo_ativo = ollama_model if llm_modo == "ollama" else groq_model
     return JSONResponse({
         "api_boletim": "online" if api_ok else "offline",
         "tools":       sessao.tools_names,
-        "modelo":      MODELO,
-        "llm_modo":    LLM_MODO,
+        "modelo":      modelo_ativo,
+        "llm_modo":    llm_modo,
         "limite_historico": LIMITE_HISTORICO
     })
 

@@ -40,6 +40,8 @@ const elElevenKey    = document.getElementById('elevenLabsKey');
 const elSummaryMode  = document.getElementById('summaryMode');
 const elGroqKey      = document.getElementById('groqKey');
 const elGnewsKey     = document.getElementById('gnewsKey');
+const elLlmModo      = document.getElementById('llmModo');
+const elGroqModelo   = document.getElementById('groqModelo');
 
 // ── INICIALIZAÇÃO ─────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -470,6 +472,8 @@ async function carregarConfig() {
     const c = await r.json();
     if (elTtsEngine   && c.TTS_ENGINE)      elTtsEngine.value   = c.TTS_ENGINE;
     if (elSummaryMode && c.AI_SUMMARY_MODE) elSummaryMode.value = c.AI_SUMMARY_MODE;
+    if (elLlmModo     && c.LLM_MODO)       elLlmModo.value     = c.LLM_MODO;
+    if (elGroqModelo  && c.GROQ_MODELO)    elGroqModelo.value  = c.GROQ_MODELO;
   } catch { /* silencioso */ }
 }
 
@@ -484,7 +488,9 @@ async function salvarConfig() {
       tts_engine:         elTtsEngine?.value   || 'gtts',
       groq_api_key:       elGroqKey?.value     || null,
       elevenlabs_api_key: elElevenKey?.value   || null,
-      gnews_api_key:      elGnewsKey?.value    || null
+      gnews_api_key:      elGnewsKey?.value    || null,
+      llm_modo:           elLlmModo?.value     || null,
+      groq_modelo:        elGroqModelo?.value  || null
     };
 
     const r = await fetch('/api/config', {
@@ -494,8 +500,9 @@ async function salvarConfig() {
     });
 
     if (r.ok) {
+      // Notifica interface_locutor.py para recarregar as variáveis do .env sem reiniciar
+      await fetch('/llm-reload', { method: 'POST' }).catch(() => null);
       elBtnSalvar.textContent = '✓ Salvo!';
-      // Atualiza o painel de info e recarrega os selects para confirmar ao usuário
       await Promise.all([verificarStatus(), carregarConfig()]);
     } else {
       elBtnSalvar.textContent = '✗ Erro';

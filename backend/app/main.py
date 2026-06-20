@@ -99,6 +99,8 @@ class ConfigResponse(BaseModel):
     ELEVENLABS_API_KEY: str
     AI_SUMMARY_MODE: str
     TTS_ENGINE: str
+    LLM_MODO: str
+    GROQ_MODELO: str
 
 
 class ConfigSaveRequest(BaseModel):
@@ -107,6 +109,8 @@ class ConfigSaveRequest(BaseModel):
     elevenlabs_api_key: Optional[str] = None
     ai_summary_mode: str
     tts_engine: str
+    llm_modo: Optional[str] = None
+    groq_modelo: Optional[str] = None
 
 # Middleware do Banco de Dados
 
@@ -394,6 +398,10 @@ async def save_configuracoes(request: ConfigSaveRequest):
 
         updates['AI_SUMMARY_MODE'] = request.ai_summary_mode
         updates['TTS_ENGINE'] = request.tts_engine
+        if request.llm_modo:
+            updates['LLM_MODO'] = request.llm_modo
+        if request.groq_modelo:
+            updates['GROQ_MODELO'] = request.groq_modelo
 
         success = env_manager.update_env_file(updates)
 

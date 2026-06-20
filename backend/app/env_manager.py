@@ -14,10 +14,12 @@ def load_env_variables() -> Dict[str, str]:
     """
     config = {
         "GNEWS_API_KEY": "",
-        "GROQ_API_KEY": "",           # ← MUDADO: Groq em vez de Gemini
+        "GROQ_API_KEY": "",
         "ELEVENLABS_API_KEY": "",
-        "AI_SUMMARY_MODE": "groq",    # ← MUDADO: Padrão agora é groq
-        "TTS_ENGINE": "gtts"
+        "AI_SUMMARY_MODE": "none",
+        "TTS_ENGINE": "gtts",
+        "LLM_MODO": "groq",
+        "GROQ_MODELO": "meta-llama/llama-4-scout-17b-16e-instruct"
     }
 
     if not os.path.exists(ENV_FILE_PATH):
