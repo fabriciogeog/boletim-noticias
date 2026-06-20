@@ -308,6 +308,7 @@ def _relaxar_schema(schema: dict) -> dict:
 
 def _coerce_args(tool_name: str, args: dict) -> dict:
     """Converte tipos de argumentos conforme o schema da tool (corrige Groq enviando int como string)."""
+    args = args or {}
     tool = next((t for t in sessao.tools if t.name == tool_name), None)
     if not tool or not tool.inputSchema:
         return args
@@ -359,7 +360,7 @@ async def conversar(pergunta: str, historico_anterior: list = None) -> str:
         if msg.get("tool_calls"):
             for tc in msg["tool_calls"]:
                 nome = tc["function"]["name"]
-                args = _coerce_args(nome, tc["function"]["arguments"])
+                args = _coerce_args(nome, tc["function"].get("arguments"))
                 try:
                     resultado = await sessao.session.call_tool(nome, args)
                     conteudo  = resultado.content[0].text if resultado.content else "sem resultado"
