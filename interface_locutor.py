@@ -46,7 +46,7 @@ OLLAMA_MODELO   = os.getenv("OLLAMA_MODELO", "qwen2.5:7b")
 # Groq
 GROQ_API_KEY    = os.getenv("GROQ_API_KEY",  "")
 GROQ_URL        = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODELO     = os.getenv("GROQ_MODELO",   "llama-3.1-8b-instant")
+GROQ_MODELO     = os.getenv("GROQ_MODELO",   "llama-3.3-70b-versatile")
 
 # Modelo ativo (para exibição no status)
 MODELO          = OLLAMA_MODELO if LLM_MODO == "ollama" else GROQ_MODELO
@@ -127,8 +127,12 @@ Regras:
 
       [campo "texto" retornado por gerar_boletim — copie integralmente, sem resumir, sem cortar]
 
-5. NUNCA invente links, URLs ou caminhos que não foram retornados pelas ferramentas.
-6. O texto do boletim deve aparecer COMPLETO e INTACTO, exatamente como retornado no campo "texto" de gerar_boletim."""
+5. Ao excluir boletins, siga esta sequência OBRIGATÓRIA:
+   a. Chame deletar_boletim (para um boletim) ou deletar_boletins_em_lote (para vários).
+   b. CRÍTICO: NUNCA confirme exclusão sem ter chamado a tool. Jamais invente o resultado de uma exclusão.
+   c. Responda apenas com o que a tool retornou. Se a tool não foi chamada, NÃO diga que o boletim foi excluído.
+6. NUNCA invente links, URLs ou caminhos que não foram retornados pelas ferramentas.
+7. O texto do boletim deve aparecer COMPLETO e INTACTO, exatamente como retornado no campo "texto" de gerar_boletim."""
 
 # ================================================
 # SESSÃO MCP GLOBAL
