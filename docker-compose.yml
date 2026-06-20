@@ -12,6 +12,7 @@ services:
       - ./backend/app:/app
       - ./data:/app/data
       - ./audio:/app/audio
+      - ./.env:/app/.env
     env_file:
       - .env
     environment:
