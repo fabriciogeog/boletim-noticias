@@ -46,7 +46,7 @@ OLLAMA_MODELO   = os.getenv("OLLAMA_MODELO", "qwen2.5:7b")
 # Groq
 GROQ_API_KEY    = os.getenv("GROQ_API_KEY",  "")
 GROQ_URL        = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODELO     = os.getenv("GROQ_MODELO",   "llama-3.3-70b-versatile")
+GROQ_MODELO     = os.getenv("GROQ_MODELO",   "meta-llama/llama-4-scout-17b-16e-instruct")
 
 # Modelo ativo (para exibição no status)
 MODELO          = OLLAMA_MODELO if LLM_MODO == "ollama" else GROQ_MODELO
