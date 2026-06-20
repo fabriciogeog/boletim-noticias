@@ -59,7 +59,7 @@ async def gerar_boletim(
     'elevenlabs' para voz premium.
     Parâmetro modo_resumo: 'none' para texto direto, 'groq' para resumo por IA.
     Após gerar, sempre chame confirmar_audio com o filename retornado.
-    Retorna id, nome do arquivo de áudio, categorias e prévia do texto."""
+    Retorna id, nome do arquivo de áudio, categorias e texto completo do boletim."""
     try:
         resultado = await _post("/api/generate-boletim", {
             "categories": categorias,
@@ -74,7 +74,7 @@ async def gerar_boletim(
             "id": resultado.get("id"),
             "audio": resultado.get("audio_filename"),
             "categorias": resultado.get("categories"),
-            "texto_preview": resultado.get("summary_text", "")[:300] + "...",
+            "texto": resultado.get("summary_text", ""),
             "status": "boletim gerado com sucesso"
         }
     except httpx.HTTPStatusError as e:

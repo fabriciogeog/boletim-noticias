@@ -119,17 +119,16 @@ Regras:
 4. Ao gerar um boletim novo, siga SEMPRE esta sequência obrigatória:
    a. Chame gerar_boletim com os parâmetros solicitados.
    b. Chame confirmar_audio com o filename retornado para validar o áudio.
-   c. Chame ler_boletim com o id retornado.
-   d. Apresente a resposta final EXATAMENTE neste formato, sem inventar links:
+   c. Apresente a resposta final EXATAMENTE neste formato, sem inventar links:
 
       Boletim gerado com sucesso.
       ID: [id]
       Áudio: [filename] (disponível na pasta audio/ do sistema)
 
-      [texto completo retornado por ler_boletim — copie integralmente, sem resumir, sem cortar]
+      [campo "texto" retornado por gerar_boletim — copie integralmente, sem resumir, sem cortar]
 
 5. NUNCA invente links, URLs ou caminhos que não foram retornados pelas ferramentas.
-6. O texto do boletim deve aparecer COMPLETO e INTACTO, exatamente como retornado por ler_boletim."""
+6. O texto do boletim deve aparecer COMPLETO e INTACTO, exatamente como retornado no campo "texto" de gerar_boletim."""
 
 # ================================================
 # SESSÃO MCP GLOBAL
